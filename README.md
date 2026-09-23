@@ -1,291 +1,205 @@
-# Validador de Historias de Usuario (LangGraph + Gemini/Ollama + Streamlit)
+# Generador de Historias de Usuario (Ollama local o Gemini API)
 
-Agente que valida historias de usuario con un flujo controlado: las reglas duras se
-resuelven en **Python** (gratis, determinista) y el **LLM** solo interviene donde hace falta juicio.
+Genera historias de usuario listas para backlog: 6 para pasajero, 5 para conductor,
+4 para administrador (cantidades configurables). Puedes elegir en el programa si
+conecta a **tu modelo local de Ollama** o a la **API de Gemini**, con respaldo
+automático al otro proveedor si el principal falla.
 
-## Flujo
+## Por qué ya no se repiten las historias
 
-```mermaid
-flowchart TD
-    START([START]) --> PV[prevalidar<br/>Python]
-    PV -->|errores bloqueantes| FR[finalizar]
-    PV -->|OK| AN[analizar<br/>LLM]
-    AN -->|no es HU / error| FR
-    AN -->|OK| INV[invest<br/>LLM]
-    AN -->|OK| AMB[ambiguedad<br/>LLM]
-    INV --> SCORE[puntuar<br/>Python]
-    AMB --> SCORE
-    SCORE -->|requiere_reescritura| RW[reescribir<br/>LLM]
-    SCORE -->|aprobada / con observaciones| CR[criterios<br/>LLM]
-    RW --> CR2[criterios<br/>LLM]
-    CR2 --> FR
-    CR -->|aprobada| FR
-    CR -->|con observaciones| RW2[reescribir<br/>LLM]
-    RW2 --> FR
-    FR --> END([END])
+Un modelo local pequeño a veces "rellena" la cantidad pedida copiando la primera
+historia con distinto ID. Dos capas lo evitan:
 
-    style PV fill:#4CAF50,color:#fff
-    style AN fill:#2196F3,color:#fff
-    style INV fill:#2196F3,color:#fff
-    style AMB fill:#2196F3,color:#fff
-    style SCORE fill:#4CAF50,color:#fff
-    style CR fill:#2196F3,color:#fff
-    style CR2 fill:#2196F3,color:#fff
-    style RW fill:#2196F3,color:#fff
-    style RW2 fill:#2196F3,color:#fff
-    style FR fill:#4CAF50,color:#fff
+1. **Tema obligatorio y distinto por historia** (`generador/temas.py`), tomado del
+   documento de Alcances del proyecto: en vez de dejarle la diversidad al azar del
+   modelo, se le asigna qué debe cubrir cada historia. Esto también mantiene todas
+   las historias dentro del alcance de BusetasApp (nada de pagos, reservas, etc.).
+2. **Validación con Pydantic + reintento automático**: `HistoriasGeneradas` rechaza
+   cualquier salida con dos historias repetidas en el mismo rol; si el modelo repite,
+   `with_retry` fuerza un segundo intento antes de rendirse (y si hay Gemini
+   configurado, `with_fallbacks` prueba con él después).
+
+## Por qué es rápido
+
+1. **Una sola llamada al LLM**, no 15. El prompt pide las tres listas completas en una
+   sola pasada: se paga una sola vez el costo fijo de cargar el modelo y el prompt.
+2. **`method="json_schema"`** (por defecto en `langchain-ollama`): usa el parámetro
+   `format` nativo de Ollama para forzar JSON, que es más liviano que el tool-calling
+   que usan otros proveedores.
+3. **`num_ctx` y `num_predict` acotados** en `.env`: el modelo no reserva ni genera
+   más contexto del que necesita para 15 historias cortas.
+4. **Prompt compacto**, sin ejemplos largos ni razonamiento pedido: solo reglas y
+   formato. Los modelos locales chicos son más rápidos (y más precisos) con
+   instrucciones cortas y directas.
+5. **Respaldo a Gemini opcional** vía `with_fallbacks`, solo si configuras
+   `GOOGLE_API_KEY`; si no, el sistema usa solo Ollama.
+
+## Arquitectura del agente
+
+El generador es una **cadena lineal de LLM (LCL)** con **una sola ejecución**:
+no hay grafo de estados ni pasos intermedios con memoria. El flujo completo de
+una petición es:
+
+```
+Entrada: app.py (Streamlit)  |  generador/cli.py (consola)
+   │   cantidades por rol, nombre de la app, contexto,
+   │   proveedor principal y modelo elegidos
+   ▼
+config.py ── Settings (dataclass congelada) leída de .env
+   │         (modelos, temperature, num_ctx, num_predict, orden)
+   ▼
+llm.py ── build_providers() → lista ordenada [(primario), (respaldo)]
+   │      ChatOllama (local) y/o ChatGoogleGenerativeAI (API);
+   │      Gemini se omite si no hay GOOGLE_API_KEY
+   ▼
+generar.py ── build_chain():
+   │
+   │   prompts.py ── GENERATE_PROMPT (ChatPromptTemplate, un solo prompt
+   │                 con las 3 listas y sus temas obligatorios)
+   │        │
+   │        ▼
+   │   llm.with_structured_output(HistoriasGeneradas)
+   │        │   · Ollama: method="json_schema" (format nativo)
+   │        │   · with_retry(×2): si Pydantic rechaza (historias repetidas
+   │        │     o mal formadas) → reintento automático
+   │        │   · with_fallbacks: si el primario falla → respaldo
+   │        ▼
+   ▼
+schemas.py ── HistoriasGeneradas validada (sin "quiero" repetido por rol)
+   │
+   ▼
+Salida: (HistoriasGeneradas, segundos) → stdout / archivo .txt /
+        pestañas + DataFrame + descargas .txt/.csv en Streamlit
 ```
 
-🟢 = Python puro (gratis) | 🔵 = LLM (costo de inferencia)
+**Capas por responsabilidad:**
 
-## Diagrama de clases del flujo
-
-```mermaid
-classDiagram
-    direction TB
-
-    class InputState {
-        +str raw_story
-        +str project_context
-    }
-
-    class GraphState {
-        +Prevalidation prevalidation
-        +StoryAnalysis analysis
-        +InvestEvaluation invest
-        +AmbiguityReport ambiguity
-        +AcceptanceCriteria criteria
-        +RewriteSuggestion rewrite
-        +float invest_score
-        +str preliminary_verdict
-        +list~str~ errors
-        +list~str~ providers
-        +list~TraceEntry~ trace
-        +FinalResult result
-    }
-
-    class OutputState {
-        +FinalResult result
-        +list~TraceEntry~ trace
-    }
-
-    class TraceEntry {
-        +str node
-        +str status
-        +int ms
-        +str detail
-    }
-
-    class Prevalidation {
-        +bool ok
-        +str story_id
-        +str clean_story
-        +int word_count
-        +bool has_role
-        +bool has_action
-        +bool has_benefit
-        +list~str~ blocking_errors
-        +list~str~ warnings
-        +list~str~ vague_terms
-    }
-
-    class StoryAnalysis {
-        +bool es_historia_usuario
-        +str rol
-        +str accion
-        +str beneficio
-        +str resumen
-    }
-
-    class InvestEvaluation {
-        +InvestCriterion independent
-        +InvestCriterion negotiable
-        +InvestCriterion valuable
-        +InvestCriterion estimable
-        +InvestCriterion small
-        +InvestCriterion testable
-        +float promedio
-        +int minimo
-    }
-
-    class InvestCriterion {
-        +int puntaje
-        +str justificacion
-        +str sugerencia
-        +bool cumple
-    }
-
-    class AmbiguityReport {
-        +list~AmbiguityItem~ items
-        +str nivel
-    }
-
-    class AmbiguityItem {
-        +str fragmento
-        +str problema
-        +str pregunta_aclaratoria
-    }
-
-    class AcceptanceCriteria {
-        +list~AcceptanceCriterion~ criterios
-    }
-
-    class AcceptanceCriterion {
-        +str escenario
-        +str dado
-        +str cuando
-        +str entonces
-    }
-
-    class RewriteSuggestion {
-        +str historia_mejorada
-        +list~str~ cambios
-        +list~str~ preguntas_pendientes
-    }
-
-    class FinalResult {
-        +str historia_original
-        +str story_id
-        +str veredicto
-        +float puntaje_invest
-        +str resumen
-        +Prevalidation prevalidacion
-        +StoryAnalysis analisis
-        +InvestEvaluation invest
-        +AmbiguityReport ambiguedad
-        +AcceptanceCriteria criterios
-        +RewriteSuggestion reescritura
-        +list~str~ proveedores_usados
-        +list~str~ errores
-    }
-
-    class Veredicto {
-        <<Literal>>
-        aprobada
-        aprobada_con_observaciones
-        requiere_reescritura
-        rechazada
-        no_evaluada
-    }
-
-    InputState <|-- GraphState
-    OutputState *-- FinalResult
-    OutputState *-- TraceEntry
-    GraphState *-- Prevalidation
-    GraphState *-- StoryAnalysis
-    GraphState *-- InvestEvaluation
-    GraphState *-- AmbiguityReport
-    GraphState *-- AcceptanceCriteria
-    GraphState *-- RewriteSuggestion
-    GraphState *-- FinalResult
-    InvestEvaluation *-- InvestCriterion
-    AmbiguityReport *-- AmbiguityItem
-    AcceptanceCriteria *-- AcceptanceCriterion
-    FinalResult *-- Prevalidation
-    FinalResult *-- StoryAnalysis
-    FinalResult *-- InvestEvaluation
-    FinalResult *-- AmbiguityReport
-    FinalResult *-- AcceptanceCriteria
-    FinalResult *-- RewriteSuggestion
-    FinalResult --> Veredicto
-```
-
-**Relaciones:**
-- `InputState ──► GraphState`: herencia (GraphState extiende InputState)
-- `OutputState ◆── FinalResult`: composición (OutputState contiene FinalResult)
-- `GraphState ◆── Prevalidation`: composición (GraphState contiene cada modelo)
-- `FinalResult ◆── *`: composición (agrega todos los modelos como resultados)
-- `FinalResult ──► Veredicto`: referencia (usa el tipo Literal Veredicto)
-
-| Nodo | Tipo | Qué hace |
+| Capa | Archivo | Qué hace |
 |---|---|---|
-| prevalidar | Python | Limpia el texto, extrae el ID (HU-01), detecta rol/acción/beneficio, términos vagos y detalles técnicos. Corta el flujo si no es una HU (0 llamadas al LLM). |
-| analizar | LLM | Descompone en rol / acción / beneficio y confirma que es una HU. |
-| invest ∥ ambiguedad | LLM (paralelo) | Evaluación INVEST (6 criterios, 1–5) y lista de ambigüedades con preguntas para el PO. |
-| puntuar | Python | Calcula el promedio INVEST y el **veredicto** con reglas fijas (el LLM no decide el veredicto). |
-| criterios | LLM | Criterios de aceptación Gherkin (Dado / Cuando / Entonces). |
-| reescribir | LLM | Historia mejorada en formato "Como…, quiero…, para…". |
-| finalizar | Python | Ensambla el `FinalResult` (Pydantic). |
+| Presentación | `app.py`, `generador/cli.py` | Interfaz Streamlit y consola (argparse); recogen la entrada y muestran el resultado |
+| Configuración | `generador/config.py` | `Settings` inmutable cargada de `.env` (modelos, orden de proveedores, límites) |
+| Proveedores LLM | `generador/llm.py` | Construye `ChatOllama` / `ChatGoogleGenerativeAI` en el orden elegido, con modelo editable por invocación |
+| Orquestación | `generador/generar.py` | Arma la cadena (`prompt \| structured_output \| retry \| fallback`) y ejecuta la única `invoke()` |
+| Contratos | `generador/schemas.py` | Modelos Pydantic de salida; validan la respuesta del modelo e impiden duplicados |
+| Reglas de negocio | `generador/temas.py` | Temas obligatorios y distintos por historia (previene repetición y mantiene el alcance) |
+| Prompt | `generador/prompts.py` | Un solo `ChatPromptTemplate` compacto para las tres listas |
 
-Veredictos: `aprobada`, `aprobada_con_observaciones`, `requiere_reescritura`, `rechazada`, `no_evaluada`.
+### Nodos de estado
 
-## Instalación paso a paso
+**Este producto no tiene nodos de estados.** El generador es una cadena única y
+lineal (`prompt | modelo | retry | fallback`): no usa `StateGraph` de LangGraph,
+no hay máquina de estados, ni estado compartido entre pasos intermedios. El único
+"estado" es:
 
-### 1. Entorno virtual e instalación
+- el resultado `HistoriasGeneradas`, que se devuelve al terminar la llamada; y
+- `st.session_state` de Streamlit, que solo conserva en la interfaz la última
+  generación (historias, segundos y proveedor usados) para no perderla al
+  interactuar con la página.
 
-Linux / macOS:
+## Tecnologías utilizadas
+
+| Tecnología | Versión requerida | Rol en el proyecto |
+|---|---|---|
+| **Python** | 3.12 | Lenguaje del proyecto (100 % Python, sin JS/TS) |
+| **langchain-core** | `>=1.0` | Cadenas LCEL: `prompt \| modelo`, `with_structured_output`, `with_retry`, `with_fallbacks` |
+| **langchain-ollama** | `>=1.0` | `ChatOllama`: modelo local vía `http://localhost:11434` con `json_schema`, `num_ctx` y `num_predict` acotados |
+| **langchain-google-genai** | `>=3.0` | `ChatGoogleGenerativeAI`: API de Gemini como proveedor principal o de respaldo |
+| **Pydantic** | `>=2.7` | Esquemas de salida y validación (detecta historias repetidas → fuerza reintento) |
+| **python-dotenv** | `>=1.0` | Carga de variables de entorno desde `.env` |
+| **Streamlit** | `>=1.50` | Interfaz gráfica (`app.py`): sidebar de configuración, pestañas por rol, tabla y descargas |
+| **pandas** | `>=2.0` | DataFrame de historias y exportación a CSV (con BOM para Excel) |
+| **pytest** | `>=8.0` | Pruebas unitarias con LLM simulado (sin llamadas reales) |
+
+**Proveedores de modelos** (configurables en `.env`):
+
+- **Ollama** — principal por defecto; corre en local (`ollama serve`), modelo
+  `llama3.1:8b` con `num_ctx=4096` y `num_predict=1800` para máxima velocidad.
+- **Gemini** — alternativa/respaldo vía `GOOGLE_API_KEY`, modelo
+  `gemini-2.5-flash`; se omite automáticamente si no hay clave configurada.
+
+El proyecto **no usa** base de datos, servidor API propio, Docker ni
+cola de trabajos: Streamlit es el único servidor y el estado vive en memoria
+por cada invocación.
+
+## Instalación
+
 ```bash
+cd generador-historias
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-Windows (PowerShell):
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-### 2. Ollama (respaldo local)
+### Ollama
 ```bash
-ollama serve                 # si no está corriendo como servicio
-ollama pull llama3.1:8b      # o el modelo que prefieras; ajusta OLLAMA_MODEL en .env
-ollama list                  # verifica que aparezca
+ollama serve                 # si no corre como servicio
+ollama pull llama3.1:8b      # o el modelo que prefieras
 ```
+Modelos más chicos (ej. `llama3.1:8b`, `qwen2.5:7b`, `phi3:mini`) responden más rápido;
+súbelo a algo mayor solo si la calidad del JSON no es suficiente.
 
-### 3. Variables de entorno
+### Variables de entorno
 ```bash
-cp .env.example .env         # Windows: copy .env.example .env
+cp .env.example .env
 ```
-Edita `.env` y pega tu `GOOGLE_API_KEY` (https://aistudio.google.com/apikey).
-Sin clave, el sistema arranca solo con Ollama. Confirma que `GEMINI_MODEL` sea un modelo vigente.
+Ajusta `OLLAMA_MODEL` al modelo que ya tengas descargado.
 
-### 4. Pruebas (no consumen LLM)
+## Uso
+
+### Consola
 ```bash
-python -m pytest -q
+python -m pytest -q                          # pruebas sin LLM real
+
+python -m generador.cli                      # 6 pasajero / 5 conductor / 4 administrador
+python -m generador.cli --out historias.txt  # además, guarda el resultado en un archivo
+python -m generador.cli --pasajero 8 --conductor 3 --administrador 5
+python -m generador.cli --app "Mi App" --context "Descripción del proyecto..."
+
+# Elegir proveedor principal y modelo (el otro queda de respaldo)
+python -m generador.cli --provider ollama --model phi3:mini
+python -m generador.cli --provider gemini --model gemini-2.5-flash
 ```
 
-### 5. Consola
-```bash
-python -m validador.cli "HU-01: Como pasajero, quiero ver las rutas, para saber cuáles existen."
-python -m validador.cli --file historias_ejemplo.txt
-python -m validador.cli --file historias_ejemplo.txt --json > resultados.json
-```
+La consola imprime, al final (en stderr, no se mezcla con el resultado), cuánto tardó
+la generación y con qué proveedor/modelo se hizo — útil para comparar modelos o
+ajustar `OLLAMA_NUM_PREDICT`.
 
-### 6. Interfaz
+### Interfaz gráfica (Streamlit)
 ```bash
 streamlit run app.py
 ```
-Abre http://localhost:8501. En la barra lateral eliges proveedor (automático, solo Gemini o solo Ollama),
-ves el estado de cada uno y puedes editar el contexto del proyecto.
-
-## Cómo funciona el respaldo Gemini → Ollama
-
-Cada cadena es `prompt | llm.with_structured_output(Esquema) | etiqueta`, envuelta en:
-1. `with_retry`: si la salida no cumple el esquema Pydantic, reintenta **una vez** en el mismo proveedor.
-2. `with_fallbacks`: si sigue fallando, o hay error de red / cuota / timeout, pasa al siguiente proveedor.
-
-Cada resultado indica qué proveedor lo produjo (`proveedores_usados`).
+Abre http://localhost:8501. En la barra lateral eliges el **proveedor**
+(`🟢 Ollama (local)` o `✨ Gemini (API)`) y el **modelo** a usar (prellenado con el
+del `.env`, editable); el otro proveedor queda como respaldo automático. También
+defines el nombre de la app, el contexto y cuántas historias quieres por rol; el
+botón "Generar historias" hace la única llamada al modelo y muestra el resultado en
+pestañas por rol, una tabla completa y botones para descargar en `.txt` o `.csv`.
+Si no hay ningún proveedor configurado (ni Ollama corriendo ni `GOOGLE_API_KEY`),
+el botón queda deshabilitado y se explica el motivo arriba.
 
 ## Estructura
 
 ```
-app.py                  Interfaz Streamlit
-validador/
-  config.py             Variables de entorno
-  schemas.py            Modelos Pydantic (contratos de cada nodo)
-  state.py              Estado del grafo con reducers (Annotated) e input/output schema
-  prompts.py            ChatPromptTemplate
-  llm.py                Gemini + Ollama y chequeo de salud
-  chains.py             Cadenas LCEL con retry y fallbacks
-  nodes.py              Nodos + reglas deterministas del veredicto
-  graph.py              Aristas condicionales, paralelismo y compilación
-  cli.py                Uso por consola
-tests/test_graph.py     Pruebas del flujo con cadenas falsas
+generador/
+  config.py     Variables de entorno
+  schemas.py    Pydantic: HistoriaUsuario y HistoriasGeneradas (valida sin repetidos)
+  temas.py      Temas obligatorios por rol, tomados del documento de Alcances
+  prompts.py    Un solo ChatPromptTemplate compacto
+  llm.py        Construye Ollama/Gemini con orden y modelo elegibles (fallback)
+  generar.py    Arma la cadena (json_schema + retry + fallback) y ejecuta UNA llamada
+  cli.py        Interfaz de consola
+app.py        Interfaz Streamlit
+tests/test_generar.py   Pruebas con LLM simulado (incluye el caso de repetidos)
 ```
 
-## Ajustes frecuentes
-- **Umbrales del veredicto:** `APPROVE_THRESHOLD` y `MIN_THRESHOLD` en `.env`.
-- **Modelo local pequeño que no respeta el esquema:** usa un modelo de 7–8B o más; los reintentos y el respaldo ayudan, pero un modelo muy pequeño fallará seguido.
-- **Términos vagos / técnicos:** edita las listas `VAGUE_TERMS` y `TECH_TERMS` en `validador/nodes.py`.
+## Nota sobre tildes en el CSV
+
+El CSV se descarga con BOM (`utf-8-sig`) para que Excel muestre bien las tildes y
+la ñ. Si igual las ves mal en algún programa, al importar el CSV elige manualmente
+la codificación UTF-8.
+
+## Si quieres integrarlo con el validador
+
+Cada historia generada (`h.texto`) ya viene en el formato
+`"Como X, quiero Y, para Z"`, así que puedes pasarla directo al validador del otro
+proyecto (`validador-historias`) sin transformarla.
