@@ -1,0 +1,53 @@
+# ────────────────────────── Variables de entorno ──────────────────────────
+# API keys y configuración sensible (NUNCA subir al repositorio)
+.env
+
+# ────────────────────────── Python ──────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+pip-wheel-metadata/
+
+# ────────────────────────── Virtual Environment ──────────────────────────
+.venv/
+venv/
+ENV/
+env/
+
+# ────────────────────────── IDEs y editores ──────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ────────────────────────── Streamlit ──────────────────────────────────
+.streamlit/secrets.toml
+
+# ────────────────────────── Pytest ─────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ────────────────────────── Archivos de resultados ─────────────────────
+resultados.json
+*.json
+!package.json
+
+# ────────────────────────── Logs ──────────────────────────────────────
+*.log
+logs/
+
+# ────────────────────────── Archivos temporales ───────────────────────
+diagnostico_bytes.py
+*.tmp
+*.bak
