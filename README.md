@@ -34,93 +34,6 @@ historia con distinto ID. Dos capas lo evitan:
 5. **Respaldo a Gemini opcional** vía `with_fallbacks`, solo si configuras
    `GOOGLE_API_KEY`; si no, el sistema usa solo Ollama.
 
-## Arquitectura del agente
-
-El generador es una **cadena lineal de LLM (LCL)** con **una sola ejecución**:
-no hay grafo de estados ni pasos intermedios con memoria. El flujo completo de
-una petición es:
-
-```
-Entrada: app.py (Streamlit)  |  generador/cli.py (consola)
-   │   cantidades por rol, nombre de la app, contexto,
-   │   proveedor principal y modelo elegidos
-   ▼
-config.py ── Settings (dataclass congelada) leída de .env
-   │         (modelos, temperature, num_ctx, num_predict, orden)
-   ▼
-llm.py ── build_providers() → lista ordenada [(primario), (respaldo)]
-   │      ChatOllama (local) y/o ChatGoogleGenerativeAI (API);
-   │      Gemini se omite si no hay GOOGLE_API_KEY
-   ▼
-generar.py ── build_chain():
-   │
-   │   prompts.py ── GENERATE_PROMPT (ChatPromptTemplate, un solo prompt
-   │                 con las 3 listas y sus temas obligatorios)
-   │        │
-   │        ▼
-   │   llm.with_structured_output(HistoriasGeneradas)
-   │        │   · Ollama: method="json_schema" (format nativo)
-   │        │   · with_retry(×2): si Pydantic rechaza (historias repetidas
-   │        │     o mal formadas) → reintento automático
-   │        │   · with_fallbacks: si el primario falla → respaldo
-   │        ▼
-   ▼
-schemas.py ── HistoriasGeneradas validada (sin "quiero" repetido por rol)
-   │
-   ▼
-Salida: (HistoriasGeneradas, segundos) → stdout / archivo .txt /
-        pestañas + DataFrame + descargas .txt/.csv en Streamlit
-```
-
-**Capas por responsabilidad:**
-
-| Capa | Archivo | Qué hace |
-|---|---|---|
-| Presentación | `app.py`, `generador/cli.py` | Interfaz Streamlit y consola (argparse); recogen la entrada y muestran el resultado |
-| Configuración | `generador/config.py` | `Settings` inmutable cargada de `.env` (modelos, orden de proveedores, límites) |
-| Proveedores LLM | `generador/llm.py` | Construye `ChatOllama` / `ChatGoogleGenerativeAI` en el orden elegido, con modelo editable por invocación |
-| Orquestación | `generador/generar.py` | Arma la cadena (`prompt \| structured_output \| retry \| fallback`) y ejecuta la única `invoke()` |
-| Contratos | `generador/schemas.py` | Modelos Pydantic de salida; validan la respuesta del modelo e impiden duplicados |
-| Reglas de negocio | `generador/temas.py` | Temas obligatorios y distintos por historia (previene repetición y mantiene el alcance) |
-| Prompt | `generador/prompts.py` | Un solo `ChatPromptTemplate` compacto para las tres listas |
-
-### Nodos de estado
-
-**Este producto no tiene nodos de estados.** El generador es una cadena única y
-lineal (`prompt | modelo | retry | fallback`): no usa `StateGraph` de LangGraph,
-no hay máquina de estados, ni estado compartido entre pasos intermedios. El único
-"estado" es:
-
-- el resultado `HistoriasGeneradas`, que se devuelve al terminar la llamada; y
-- `st.session_state` de Streamlit, que solo conserva en la interfaz la última
-  generación (historias, segundos y proveedor usados) para no perderla al
-  interactuar con la página.
-
-## Tecnologías utilizadas
-
-| Tecnología | Versión requerida | Rol en el proyecto |
-|---|---|---|
-| **Python** | 3.12 | Lenguaje del proyecto (100 % Python, sin JS/TS) |
-| **langchain-core** | `>=1.0` | Cadenas LCEL: `prompt \| modelo`, `with_structured_output`, `with_retry`, `with_fallbacks` |
-| **langchain-ollama** | `>=1.0` | `ChatOllama`: modelo local vía `http://localhost:11434` con `json_schema`, `num_ctx` y `num_predict` acotados |
-| **langchain-google-genai** | `>=3.0` | `ChatGoogleGenerativeAI`: API de Gemini como proveedor principal o de respaldo |
-| **Pydantic** | `>=2.7` | Esquemas de salida y validación (detecta historias repetidas → fuerza reintento) |
-| **python-dotenv** | `>=1.0` | Carga de variables de entorno desde `.env` |
-| **Streamlit** | `>=1.50` | Interfaz gráfica (`app.py`): sidebar de configuración, pestañas por rol, tabla y descargas |
-| **pandas** | `>=2.0` | DataFrame de historias y exportación a CSV (con BOM para Excel) |
-| **pytest** | `>=8.0` | Pruebas unitarias con LLM simulado (sin llamadas reales) |
-
-**Proveedores de modelos** (configurables en `.env`):
-
-- **Ollama** — principal por defecto; corre en local (`ollama serve`), modelo
-  `llama3.1:8b` con `num_ctx=4096` y `num_predict=1800` para máxima velocidad.
-- **Gemini** — alternativa/respaldo vía `GOOGLE_API_KEY`, modelo
-  `gemini-2.5-flash`; se omite automáticamente si no hay clave configurada.
-
-El proyecto **no usa** base de datos, servidor API propio, Docker ni
-cola de trabajos: Streamlit es el único servidor y el estado vive en memoria
-por cada invocación.
-
 ## Instalación
 
 ```bash
@@ -158,6 +71,13 @@ python -m generador.cli --app "Mi App" --context "Descripción del proyecto..."
 # Elegir proveedor principal y modelo (el otro queda de respaldo)
 python -m generador.cli --provider ollama --model phi3:mini
 python -m generador.cli --provider gemini --model gemini-2.5-flash
+
+# SPECs (especificaciones por funcionalidad, guía del Specification Agent)
+python -m generador.cli --spec all --json historias.json   # genera y exporta las 12 SPECs
+python -m generador.cli --spec rutas                       # solo SPEC-001
+python -m generador.specs                                  # esqueleto desde el alcance (sin historias)
+python -m generador.specs --historias historias.json       # SPECs completas desde un JSON guardado
+python -m generador.specs --spec 003                       # una sola SPEC
 ```
 
 La consola imprime, al final (en stderr, no se mezcla con el resultado), cuánto tardó
@@ -177,19 +97,38 @@ pestañas por rol, una tabla completa y botones para descargar en `.txt` o `.csv
 Si no hay ningún proveedor configurado (ni Ollama corriendo ni `GOOGLE_API_KEY`),
 el botón queda deshabilitado y se explica el motivo arriba.
 
+Después de generar aparece la sección **Especificaciones (SPEC)**: un botón que
+escribe las 12 SPECs en `docs/specs/`, un desplegable para previsualizar el
+Markdown de cada una y un botón para descargarlas todas en `.zip`.
+
+### Especificaciones (SPEC)
+
+Cada funcionalidad del proyecto tiene una SPEC con las 17 secciones de la guía
+del Specification Agent (sección 7). Se arma de forma **determinista** (sin LLM)
+a partir de `docs/alcance-contexto-proyecto.md` + las historias generadas:
+requisitos, flujos, criterios de aceptación y trazabilidad salen de las historias;
+contexto, reglas de negocio, fuera de alcance, restricciones y preguntas abiertas
+salen del alcance. Lo que no está definido queda marcado como **Pendiente**
+(nada se inventa, guía §11). Archivos: `docs/specs/SPEC-001-consulta-de-rutas.md`
+… `SPEC-012-estadisticas-basicas.md`.
+
 ## Estructura
 
 ```
 generador/
   config.py     Variables de entorno
-  schemas.py    Pydantic: HistoriaUsuario y HistoriasGeneradas (valida sin repetidos)
+  schemas.py    Pydantic: historia con flujos, criterios Dado/Cuando/Entonces y sin repetidos
   temas.py      Temas obligatorios por rol, tomados del documento de Alcances
-  prompts.py    Un solo ChatPromptTemplate compacto
+  prompts.py    Prompt con reglas INVEST, flujos y criterios de aceptación
   llm.py        Construye Ollama/Gemini con orden y modelo elegibles (fallback)
   generar.py    Arma la cadena (json_schema + retry + fallback) y ejecuta UNA llamada
-  cli.py        Interfaz de consola
-app.py        Interfaz Streamlit
+  specs.py      Catálogo de 12 SPECs y ensamblador de las 17 secciones (script propio)
+  cli.py        Interfaz de consola (--spec / --json)
+app.py        Interfaz Streamlit (incluye exportación de SPECs)
+docs/alcance-contexto-proyecto.md   Fuente única de verdad del alcance
+docs/specs/   Las 12 SPECs generadas (SPEC-001 … SPEC-012)
 tests/test_generar.py   Pruebas con LLM simulado (incluye el caso de repetidos)
+tests/test_specs.py     Pruebas del mapeo historia→SPEC y de las 17 secciones
 ```
 
 ## Nota sobre tildes en el CSV
