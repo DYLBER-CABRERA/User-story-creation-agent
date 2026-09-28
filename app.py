@@ -11,7 +11,16 @@ from generador.config import get_settings
 from generador.generar import APP_NAME_DEFAULT, CONTEXT_DEFAULT, build_chain, generar_historias
 from generador.llm import build_providers
 from generador.schemas import HistoriasGeneradas
-from generador.specs import construir_specs, escribir_specs
+from generador.specs import (
+    aprobar,
+    cargar_control,
+    construir_specs,
+    congelar,
+    escribir_specs,
+    guardar_control,
+    preguntas_pendientes,
+    registrar_respuesta,
+)
 
 st.set_page_config(page_title="Generador de Historias de Usuario", page_icon="🚌", layout="wide")
 
@@ -183,13 +192,62 @@ if historias:
 
     st.divider()
     st.subheader("Especificaciones (SPEC)")
-    docs = construir_specs(historias)
+    control = cargar_control()
+    docs = construir_specs(historias, control=control)
     if st.button("Exportar SPECs a docs/specs/"):
         rutas = escribir_specs(docs)
         st.success(f"{len(rutas)} SPECs escritas en docs/specs/")
 
+    # ── control humano (guía §12): preguntas abiertas ──
+    pendientes = preguntas_pendientes(control)
+    with st.expander(f"Preguntas abiertas — {len(pendientes)} sin responder (control humano)"):
+        st.caption("La guía §12 exige resolverlas antes de poder aprobar una SPEC.")
+        campos = [
+            (q, st.text_input(f"{q['id']} — {q['pregunta']}",
+                              key=f"resp-{q['id']}-{len(pendientes)}"))
+            for q in pendientes
+        ]
+        if st.button("Guardar respuestas"):
+            guardadas = 0
+            for q, texto in campos:
+                if texto.strip() and registrar_respuesta(control, q["id"], texto.strip(), "Web"):
+                    guardadas += 1
+            if guardadas:
+                guardar_control(control)
+                st.success(f"{guardadas} respuesta(s) guardada(s).")
+                st.rerun()
+            else:
+                st.warning("Escribe al menos una respuesta.")
+
     sel = st.selectbox("Previsualizar SPEC", [d.titulo for d in docs])
     doc_sel = next(d for d in docs if d.titulo == sel)
+
+    # ── aprobación y congelación (guía §12) ──
+    clave = f"{doc_sel.num:03d}"
+    estado = (control.get("estados") or {}).get(clave, {}).get("estado", "borrador")
+    quien = st.text_input("Aprobado por", value="Equipo", key="aprobado_por")
+    b1, b2, b3 = st.columns([1, 1, 2])
+    if b1.button("Aprobar (v1.0)", disabled=estado != "borrador" or bool(pendientes)):
+        ok, msg = aprobar(control, doc_sel.num, quien.strip() or "Equipo")
+        if ok:
+            guardar_control(control)
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+    if b2.button("Congelar (FROZEN)", disabled=estado != "aprobada"):
+        ok, msg = congelar(control, doc_sel.num)
+        if ok:
+            guardar_control(control)
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+    if estado == "borrador" and pendientes:
+        b3.caption(f"Para aprobar: responde {len(pendientes)} pregunta(s) abierta(s) (guía §12).")
+    else:
+        b3.caption(f"Estado actual: **{estado}**")
+
     with st.expander(f"Ver Markdown de {doc_sel.nombre_archivo}"):
         st.code(doc_sel.markdown, language="markdown")
 

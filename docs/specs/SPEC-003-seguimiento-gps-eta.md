@@ -2,8 +2,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| Versión | 1.0 |
-| Estado | Borrador — pendiente de aprobación humana |
+| Versión | 0.1 |
+| Estado | Borrador v0.1 — pendiente de aprobación humana |
 | Funcionalidad | Seguimiento en tiempo real (GPS/ETA) |
 | Actores | Pasajero |
 | Generado | 2026-09-27 (automático) |
@@ -84,10 +84,16 @@ Sophia Cardona. Plazo: 8 semanas desde cero.
 | OPEN-Q-002 | ¿Las notificaciones salen fuera de la app o son avisos dentro de la misma? | Equipo | Pendiente |
 | OPEN-Q-003 | ¿Qué ocurre con el ETA cuando una buseta no reporta su posición? | Equipo | Pendiente |
 
+**Estado de cada pregunta (control humano):**
+
+- **OPEN-Q-001** — **Pendiente**: ¿Los datos de las rutas los suministra la empresa de transporte o se cargan manualmente?
+- **OPEN-Q-002** — **Pendiente**: ¿Las notificaciones salen fuera de la app o son avisos dentro de la misma?
+- **OPEN-Q-003** — **Pendiente**: ¿Qué ocurre con el ETA cuando una buseta no reporta su posición?
+
 ## 16. Trazabilidad
 > **Pendiente:** sin historias para trazar.
 
 ## 17. Historial de cambios
 | Versión | Fecha | Cambio | Aprobación |
 |---------|-------|--------|------------|
-| 1.0 | 2026-09-27 | Generación automática desde alcance + historias | Pendiente (humana) |
+| 0.1 | 2026-09-27 | Generación automática desde alcance + historias | Pendiente (humana) |

@@ -43,6 +43,8 @@ htmlcov/
 resultados.json
 *.json
 !package.json
+# Control humano de las SPECs (respuestas, aprobaciones, congelados) - sí va al repo
+!docs/specs/control.json
 
 # ────────────────────────── Logs ──────────────────────────────────────
 *.log

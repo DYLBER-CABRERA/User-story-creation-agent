@@ -22,11 +22,18 @@ Uso:
 CLI:
     python -m generador.specs                          # esqueleto desde el alcance
     python -m generador.specs --historias hist.json    # SPECs completas
+    python -m generador.specs --responder              # control humano: responder preguntas (§12)
+    python -m generador.specs --aprobar 001 --por "Prof. X"   # aprueba (falla si hay pendientes)
+    python -m generador.specs --congelar 001           # pasa a FROZEN
+
+Control humano (guía §12): respuestas y estados (borrador → APROBADA → FROZEN)
+se persisten en docs/specs/control.json y se comparten con la app Streamlit.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +44,7 @@ from .temas import TEMAS_POR_ROL
 RAIZ = Path(__file__).resolve().parent.parent
 ALCANCE_PATH = RAIZ / "docs" / "alcance-contexto-proyecto.md"
 SPECS_DIR = RAIZ / "docs" / "specs"
+CONTROL_PATH = SPECS_DIR / "control.json"
 
 
 @dataclass(frozen=True)
@@ -179,6 +187,137 @@ def _reglas(texto: str) -> dict[str, str]:
     return regs
 
 
+# ─────────────────── control humano (guía §11-§12) ───────────────────
+
+def cargar_control(path: Path = CONTROL_PATH) -> dict:
+    base = {"respuestas": {}, "estados": {}, "eventos": []}
+    if path.exists():
+        try:
+            datos = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(datos, dict):
+                return {**base, **datos}
+        except (json.JSONDecodeError, OSError):
+            pass
+    return base
+
+
+def guardar_control(control: dict, path: Path = CONTROL_PATH) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(control, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def _preguntas(cuerpo: str) -> list[dict]:
+    """Filas '| OPEN-Q-001 | ¿pregunta? | Responsable | Pendiente |' de §10."""
+    preguntas: list[dict] = []
+    for linea in (cuerpo or "").splitlines():
+        if linea.strip().startswith("| OPEN-Q-"):
+            partes = [p.strip() for p in linea.strip().strip("|").split("|")]
+            if len(partes) >= 2:
+                preguntas.append({
+                    "id": partes[0],
+                    "pregunta": partes[1],
+                    "responsable": partes[2] if len(partes) > 2 else "Equipo",
+                })
+    return preguntas
+
+
+def _todas_las_preguntas(alcance_path: Path = ALCANCE_PATH) -> list[dict]:
+    return _preguntas(_sec(_leer_alcance(alcance_path), 10))
+
+
+def preguntas_pendientes(control: dict, alcance_path: Path = ALCANCE_PATH) -> list[dict]:
+    respuestas = control.get("respuestas") or {}
+    return [q for q in _todas_las_preguntas(alcance_path) if q["id"] not in respuestas]
+
+
+def registrar_respuesta(
+    control: dict,
+    pregunta_id: str,
+    respuesta: str,
+    responsable: str = "Equipo",
+    alcance_path: Path = ALCANCE_PATH,
+) -> bool:
+    if pregunta_id not in {q["id"] for q in _todas_las_preguntas(alcance_path)}:
+        return False
+    control.setdefault("respuestas", {})[pregunta_id] = {
+        "respuesta": respuesta,
+        "responsable": responsable,
+        "fecha": datetime.date.today().isoformat(),
+    }
+    return True
+
+
+def aprobar(
+    control: dict,
+    num: int,
+    por: str,
+    alcance_path: Path = ALCANCE_PATH,
+) -> tuple[bool, str]:
+    pend = preguntas_pendientes(control, alcance_path)
+    if pend:
+        ids = ", ".join(q["id"] for q in pend)
+        return False, f"No se puede aprobar: faltan respuestas a {ids} (guía §12: detener el cierre)."
+    clave = f"{num:03d}"
+    est = control.setdefault("estados", {}).get(clave)
+    if est and est.get("estado") in ("aprobada", "congelada"):
+        return False, f"SPEC-{clave} ya está {est.get('estado')}."
+    hoy = datetime.date.today().isoformat()
+    control["estados"][clave] = {"estado": "aprobada", "version": "1.0", "por": por, "fecha": hoy}
+    control.setdefault("eventos", []).append(
+        {"spec": clave, "evento": "Aprobada", "por": por, "fecha": hoy, "version": "1.0"}
+    )
+    return True, f"SPEC-{clave} APROBADA v1.0 por {por}."
+
+
+def congelar(control: dict, num: int) -> tuple[bool, str]:
+    clave = f"{num:03d}"
+    est = control.setdefault("estados", {}).get(clave)
+    if not est or est.get("estado") != "aprobada":
+        return False, f"SPEC-{clave} no está aprobada: primero apruébala (guía §12)."
+    hoy = datetime.date.today().isoformat()
+    est["estado"] = "congelada"
+    control.setdefault("eventos", []).append(
+        {"spec": clave, "evento": "Congelada", "fecha": hoy, "version": est.get("version", "1.0")}
+    )
+    return True, f"SPEC-{clave} FROZEN v{est.get('version', '1.0')}."
+
+
+def interactivo_responder(control: dict, alcance_path: Path = ALCANCE_PATH) -> dict:
+    pendientes = [q for q in _todas_las_preguntas(alcance_path)
+                  if q["id"] not in (control.get("respuestas") or {})]
+    if not pendientes:
+        print("No hay preguntas pendientes.", flush=True)
+        return control
+    for q in pendientes:
+        print(f"\n{q['id']} (responsable sugerido: {q['responsable']})", flush=True)
+        print(f"  {q['pregunta']}", flush=True)
+        resp = input("  Respuesta (Enter = omitir): ").strip()
+        if resp:
+            quien = input("  ¿Quién responde? [Equipo]: ").strip() or "Equipo"
+            registrar_respuesta(control, q["id"], resp, quien, alcance_path)
+    return control
+
+
+def _md_preguntas(secciones: dict[str, str], control: dict) -> str:
+    cuerpo = _sec(secciones, 10)
+    preguntas = _preguntas(cuerpo)
+    if not preguntas:
+        return cuerpo
+    respuestas = control.get("respuestas") or {}
+    lineas = [cuerpo, "", "**Estado de cada pregunta (control humano):**", ""]
+    for q in preguntas:
+        r = respuestas.get(q["id"])
+        if r:
+            lineas.append(
+                f"- **{q['id']}** — **Respondida** "
+                f"({r.get('responsable', '?')}, {r.get('fecha', '?')}): {r.get('respuesta', '')}"
+            )
+        else:
+            lineas.append(f"- **{q['id']}** — **Pendiente**: {q['pregunta']}")
+    return "\n".join(lineas)
+
+
 # ───────────────────────── ensamblado de la SPEC ─────────────────────────
 
 def _tema_de(rol: str, indice: int) -> str:
@@ -190,17 +329,31 @@ def _construir_markdown(
     func: Funcionalidad,
     asignadas: list[tuple[str, int, object]],  # (rol, indice, historia)
     secciones: dict[str, str],
+    control: dict,
 ) -> str:
     fecha = datetime.date.today().isoformat()
     reglas = _reglas(_sec(secciones, 7))
     n = func.num
     actores = ", ".join(func.actores)
 
+    clave = f"{n:03d}"
+    est = (control.get("estados") or {}).get(clave, {})
+    estado = est.get("estado", "borrador")
+    if estado == "aprobada":
+        version = est.get("version", "1.0")
+        estado_txt = f"APROBADA v{version} — aprobada por {est.get('por', '?')}, {est.get('fecha', '?')}"
+    elif estado == "congelada":
+        version = est.get("version", "1.0")
+        estado_txt = f"FROZEN (congelada) v{version} — cambios requieren nueva versión"
+    else:
+        estado, version = "borrador", "0.1"
+        estado_txt = "Borrador v0.1 — pendiente de aprobación humana"
+
     cabecera = (
         f"# SPEC-{n:03d} — {func.nombre}\n\n"
         "| Campo | Valor |\n|-------|-------|\n"
-        f"| Versión | 1.0 |\n"
-        f"| Estado | Borrador — pendiente de aprobación humana |\n"
+        f"| Versión | {version} |\n"
+        f"| Estado | {estado_txt} |\n"
         f"| Funcionalidad | {func.nombre} |\n"
         f"| Actores | {actores} |\n"
         f"| Generado | {fecha} (automático) |\n\n"
@@ -252,6 +405,22 @@ def _construir_markdown(
     )
     alcance_func = _bullet(_sec(secciones, 5), func.clave_alcance)
 
+    md15 = _md_preguntas(secciones, control)
+    aprob_col = {"borrador": "Pendiente (humana)", "aprobada": "APROBADA", "congelada": "FROZEN"}[estado]
+    filas_hist = [
+        f"| {version} | {fecha} | Generación automática desde alcance + historias | {aprob_col} |"
+    ]
+    for ev in control.get("eventos") or []:
+        if str(ev.get("spec")) == clave:
+            detalle = ev.get("evento", "")
+            if ev.get("por"):
+                detalle += f" por {ev['por']}"
+            aprob_ev = {"Aprobada": "APROBADA", "Congelada": "FROZEN"}.get(ev.get("evento", ""), "")
+            filas_hist.append(
+                f"| {ev.get('version', version)} | {ev.get('fecha', '')} | {detalle} | {aprob_ev} |"
+            )
+    historial = "\n".join(filas_hist)
+
     return f"""{cabecera}
 ## 1. Objetivo
 {func.objetivo}
@@ -302,7 +471,7 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 {_sec(secciones, 6)}
 
 ## 15. Preguntas abiertas
-{_sec(secciones, 10)}
+{md15}
 
 ## 16. Trazabilidad
 {traza_md}
@@ -310,16 +479,20 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 ## 17. Historial de cambios
 | Versión | Fecha | Cambio | Aprobación |
 |---------|-------|--------|------------|
-| 1.0 | {fecha} | Generación automática desde alcance + historias | Pendiente (humana) |
+{historial}
 """
 
 
 def construir_specs(
     historias: HistoriasGeneradas | None = None,
     alcance_path: Path = ALCANCE_PATH,
+    control: dict | None = None,
 ) -> list[SpecDoc]:
-    """Arma las 12 SPECs. `historias=None` genera esqueletos con §8/§9/§11/§16 pendientes."""
+    """Arma las 12 SPECs. `historias=None` genera esqueletos con §8/§9/§11/§16 pendientes.
+    `control=None` carga el estado humano desde CONTROL_PATH (si existe)."""
     secciones = _leer_alcance(alcance_path)
+    if control is None:
+        control = cargar_control()
 
     asignadas: dict[int, list[tuple[str, int, object]]] = {f.num: [] for f in CATALOGO}
     if historias is not None:
@@ -338,7 +511,7 @@ def construir_specs(
                 num=func.num,
                 slug=func.slug,
                 nombre=func.nombre,
-                markdown=_construir_markdown(func, asignadas[func.num], secciones),
+                markdown=_construir_markdown(func, asignadas[func.num], secciones, control),
             )
         )
     return docs
@@ -376,6 +549,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--historias", help="JSON de historias exportado con CLI --json (opcional)")
     ap.add_argument("--spec", default="all", help="Todas (default) o un número/slug (ej. 003, rutas)")
     ap.add_argument("--out", default=str(SPECS_DIR), help="Carpeta de salida (default: docs/specs)")
+    ap.add_argument("--control", default=None, help=f"Archivo de control humano (default: {CONTROL_PATH})")
+    ap.add_argument("--responder", action="store_true",
+                    help="Responde en consola las preguntas abiertas pendientes (guía §12)")
+    ap.add_argument("--aprobar", metavar="SPEC",
+                    help="Aprueba una SPEC (001 o slug); se niega si hay preguntas pendientes")
+    ap.add_argument("--congelar", metavar="SPEC",
+                    help="Pasa una SPEC aprobada a FROZEN (congelada)")
+    ap.add_argument("--por", default=None, help="Nombre de quién aprueba (para --aprobar)")
     args = ap.parse_args(argv)
 
     historias: HistoriasGeneradas | None = None
@@ -383,7 +564,48 @@ def main(argv: list[str] | None = None) -> int:
         texto = Path(args.historias).read_text(encoding="utf-8")
         historias = HistoriasGeneradas.model_validate_json(texto)
 
-    docs = seleccionar(construir_specs(historias), args.spec)
+    control_path = Path(args.control) if args.control else CONTROL_PATH
+    control = cargar_control(control_path)
+    accion_ok = True
+    hubo_cambios = bool(args.responder)
+
+    def _resolver_num(valor: str) -> int | None:
+        mini = [SpecDoc(f.num, f.slug, f.nombre, "") for f in CATALOGO]
+        sel = seleccionar(mini, valor)
+        if len(sel) != 1:
+            print(f"'{valor}' coincide con {len(sel)} SPECs; usa un número o slug exacto (ej. 001).",
+                  flush=True)
+            return None
+        return sel[0].num
+
+    if args.responder:
+        control = interactivo_responder(control)
+
+    if args.aprobar:
+        num = _resolver_num(args.aprobar)
+        if num is None:
+            accion_ok = False
+        else:
+            ok, msg = aprobar(control, num, args.por or "Humano")
+            print(msg, flush=True)
+            accion_ok = accion_ok and ok
+            hubo_cambios = hubo_cambios or ok
+
+    if args.congelar:
+        num = _resolver_num(args.congelar)
+        if num is None:
+            accion_ok = False
+        else:
+            ok, msg = congelar(control, num)
+            print(msg, flush=True)
+            accion_ok = accion_ok and ok
+            hubo_cambios = hubo_cambios or ok
+
+    if hubo_cambios:
+        guardar_control(control, control_path)
+        print(f"Control guardado en {control_path}", flush=True)
+
+    docs = seleccionar(construir_specs(historias, control=control), args.spec)
     if not docs:
         print(f"Ninguna SPEC coincide con '{args.spec}'.", flush=True)
         return 1
@@ -391,7 +613,7 @@ def main(argv: list[str] | None = None) -> int:
     for r in rutas:
         print(r, flush=True)
     print(f"{len(rutas)} SPEC(s) escritas en {args.out}", flush=True)
-    return 0
+    return 0 if accion_ok else 1
 
 
 if __name__ == "__main__":

@@ -112,6 +112,21 @@ salen del alcance. Lo que no está definido queda marcado como **Pendiente**
 (nada se inventa, guía §11). Archivos: `docs/specs/SPEC-001-consulta-de-rutas.md`
 … `SPEC-012-estadisticas-basicas.md`.
 
+**Control humano (guía §12):** las preguntas abiertas (§15) deben responderse
+antes de aprobar, y el estado de cada SPEC sigue el ciclo
+`borrador v0.1 → APROBADA v1.0 → FROZEN`. Respuestas y estados se guardan en
+`docs/specs/control.json` (compartido entre CLI y app):
+
+```bash
+python -m generador.specs --responder                       # responde preguntas en consola
+python -m generador.specs --aprobar 001 --por "Prof. X"     # se niega si hay preguntas pendientes
+python -m generador.specs --congelar 001                    # solo desde APROBADA
+```
+
+En la app, la sección "Especificaciones (SPEC)" tiene el expander de preguntas
+abiertas y los botones **Aprobar (v1.0)** / **Congelar (FROZEN)**; el botón de
+aprobar está deshabilitado mientras queden preguntas sin responder.
+
 ## Estructura
 
 ```
