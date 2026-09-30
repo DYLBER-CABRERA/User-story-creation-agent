@@ -16,6 +16,7 @@ from generador.specs import (
     cargar_control,
     construir_specs,
     congelar,
+    contexto_proyecto,
     detectar_cambios,
     escribir_specs,
     guardar_control,
@@ -104,7 +105,13 @@ with st.sidebar:
         st.error("No hay proveedores configurados. Revisa Ollama o GOOGLE_API_KEY en .env")
 
     app_name = st.text_input("Nombre de la app", APP_NAME_DEFAULT)
-    contexto = st.text_area("Contexto del proyecto", CONTEXT_DEFAULT, height=180)
+    contexto = st.text_area(
+        "Contexto del proyecto",
+        contexto_proyecto() or CONTEXT_DEFAULT,
+        height=180,
+        help="Generado desde docs/alcance-contexto-proyecto.md (§1, §2, §5, §6, §7, §9 "
+             "+ decisiones ya respondidas en control.json). Edítalo si quieres acotarlo.",
+    )
 
     st.subheader("Cantidades")
     n_pasajero = st.number_input("Pasajero", min_value=1, max_value=50, value=6)

@@ -4,6 +4,7 @@ from generador.specs import (
     cargar_control,
     construir_specs,
     congelar,
+    contexto_proyecto,
     detectar_cambios,
     escribir_specs,
     guardar_control,
@@ -221,3 +222,24 @@ def test_gestion_de_cambios_sube_version_y_registra_impacto():
     assert ok and "APROBADA v1.1" in msg
     assert control["estados"]["001"]["version"] == "1.1"
     assert detectar_cambios(control, construir_specs(None, control=control)) == []
+
+
+# ── contexto del LLM construido desde el alcance ───────────────────────
+
+def test_contexto_para_el_llm_sale_del_alcance():
+    control = _control_vacio()
+    ctx = contexto_proyecto(control=control)
+    assert "[PROBLEMA]" in ctx and "[SOLUCIÓN]" in ctx
+    assert "[ALCANCES" in ctx and "Consulta de rutas" in ctx
+    assert "FUERA DE ALCANCE" in ctx and "Pago de pasajes" in ctx
+    assert "REGLAS DE NEGOCIO" in ctx and "BR-01" in ctx
+    assert "[ROLES]" in ctx and "Administrador" in ctx
+    # las decisiones pendientes (§10) NO se filtran al modelo: no debe inventar
+    assert "OPEN-Q-" not in ctx
+    assert "DECISIONES YA TOMADAS" not in ctx
+    assert len(ctx) < 8000                        # cabe holgadamente en num_ctx=8192
+
+    registrar_respuesta(control, "OPEN-Q-001", "Sí, también festivos", "Profe")
+    ctx2 = contexto_proyecto(control=control)
+    assert "DECISIONES YA TOMADAS" in ctx2
+    assert "Sí, también festivos" in ctx2

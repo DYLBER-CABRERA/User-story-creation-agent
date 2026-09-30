@@ -20,6 +20,9 @@ Contexto de la app: {context}
 Reglas estrictas:
 - SOLO puedes usar funcionalidades que estén dentro del contexto anterior. No inventes
   funcionalidades ajenas al proyecto (pagos, tarjetas, transporte ajeno, etc.).
+- El contexto incluye alcances, fuera de alcance, reglas de negocio y decisiones ya
+  tomadas por el equipo: respétalas tal cual; no las contradigas ni tomes decisiones
+  pendientes por tu cuenta.
 - Formato exacto de la historia: "Como [rol], quiero [acción], para [beneficio]".
 - Cada historia debe cumplir INVEST:
   * Independent: no depende de otra historia para construirse.

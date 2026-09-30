@@ -317,6 +317,46 @@ def registrar_respuesta(
     return True
 
 
+def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = None) -> str:
+    """Contexto para el LLM del generador de historias, construido desde el
+    documento de alcance (fuente única de verdad) en lugar de texto hardcodeado.
+
+    Incluye §1 problema, §2 solución, §5 alcances, §6 fuera de alcance,
+    §7 reglas de negocio y §9 roles, más las decisiones humanas ya resueltas
+    (control.json). Excluye §10 preguntas abiertas y §12 equipo/plazo: las
+    decisiones pendientes no se le pasan al modelo (guía §8: no debe inventar
+    valores) y el planning no aporta a las historias. ~3 KB, seguro para la
+    ventana de 8192 tokens de qwen2.5:3b."""
+    secciones = _leer_alcance(alcance_path)
+    if not secciones:
+        return ""
+    if control is None:
+        control = cargar_control()
+    bloques = [
+        ("PROBLEMA", _sec(secciones, 1)),
+        ("SOLUCIÓN", _sec(secciones, 2)),
+        ("ALCANCES — SOLO ESTAS FUNCIONALIDADES", _sec(secciones, 5)),
+        ("FUERA DE ALCANCE — NUNCA INVENTES NADA DE ESTO", _sec(secciones, 6)),
+        ("REGLAS DE NEGOCIO — RESPÉTALAS EN FLUJOS Y CRITERIOS", _sec(secciones, 7)),
+        ("ROLES", _sec(secciones, 9)),
+    ]
+    partes = [
+        f"[{titulo}]\n{cuerpo.strip()}"
+        for titulo, cuerpo in bloques
+        if cuerpo and not cuerpo.startswith("_Ver")
+    ]
+    respuestas = control.get("respuestas") or {}
+    if respuestas:
+        decisiones = "\n".join(
+            f"- {pid}: {r.get('respuesta', '')} ({r.get('responsable', '?')}, {r.get('fecha', '?')})"
+            for pid, r in sorted(respuestas.items())
+        )
+        partes.append(
+            "[DECISIONES YA TOMADAS POR EL EQUIPO — NO LAS CONTRADIGAS]\n" + decisiones
+        )
+    return "\n\n".join(partes)
+
+
 def _info_secciones(markdown: str) -> dict[str, tuple[str, str]]:
     """{num_sección: (título, sha256(título+cuerpo))} para §1..§16 (cabecera y §17 excluidas)."""
     info: dict[str, tuple[str, str]] = {}

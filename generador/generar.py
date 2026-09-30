@@ -83,13 +83,18 @@ def generar_historias(
     n_conductor: int = 5,
     n_admin: int = 4,
     app_name: str = APP_NAME_DEFAULT,
-    context: str = CONTEXT_DEFAULT,
+    context: str | None = None,
     settings: Settings | None = None,
     chain: Runnable | None = None,
     order: tuple[str, ...] | list[str] | None = None,
     modelos: dict[str, str] | None = None,
 ) -> tuple[HistoriasGeneradas, float]:
     s = settings or get_settings()
+    if context is None:
+        # Contexto completo desde el documento de alcance (fuente única de verdad);
+        # CONTEXT_DEFAULT solo como respaldo si el documento no existe.
+        from .specs import contexto_proyecto
+        context = contexto_proyecto() or CONTEXT_DEFAULT
     chain = chain or build_chain(build_providers(s, order=order, modelos=modelos))
     payload = {
         "app_name": app_name,

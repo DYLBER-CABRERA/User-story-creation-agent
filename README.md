@@ -101,6 +101,17 @@ Después de generar aparece la sección **Especificaciones (SPEC)**: un botón q
 escribe las 12 SPECs en `docs/specs/`, un desplegable para previsualizar el
 Markdown de cada una y un botón para descargarlas todas en `.zip`.
 
+### Contexto que recibe el modelo
+
+El campo "Contexto del proyecto" se **prellena desde `docs/alcance-contexto-proyecto.md`**
+(fuente única de verdad) — en consola y en la app — con: §1 problema, §2 solución,
+§5 alcances, §6 fuera de alcance, §7 reglas de negocio, §9 roles y las decisiones
+humanas ya respondidas de `control.json` (~3.4 KB, seguro para `OLLAMA_NUM_CTX=8192`).
+Se excluyen §10 preguntas abiertas (decisiones pendientes: pasarlas al modelo lo
+invitaría a inventar valores, guía §8) y §12 equipo/plazo (irrelevante para historias).
+Sigue siendo editable a mano; `CONTEXT_DEFAULT` queda solo como respaldo si el
+documento no existe.
+
 ### Especificaciones (SPEC)
 
 Cada funcionalidad del proyecto tiene una SPEC con las 17 secciones de la guía

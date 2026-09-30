@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .config import get_settings
 from .generar import APP_NAME_DEFAULT, CONTEXT_DEFAULT, generar_historias
-from .specs import construir_specs, escribir_specs, seleccionar
+from .specs import construir_specs, contexto_proyecto, escribir_specs, seleccionar
 
 
 def main() -> int:
@@ -28,7 +28,11 @@ def main() -> int:
     ap.add_argument("--conductor", type=int, default=5)
     ap.add_argument("--administrador", type=int, default=4)
     ap.add_argument("--app", default=APP_NAME_DEFAULT)
-    ap.add_argument("--context", default=CONTEXT_DEFAULT)
+    ap.add_argument(
+        "--context",
+        default=contexto_proyecto() or CONTEXT_DEFAULT,
+        help="Contexto para el modelo (por defecto: generado desde docs/alcance-contexto-proyecto.md)",
+    )
     ap.add_argument("--out", help="Archivo .txt donde guardar el resultado (además de imprimirlo)")
     ap.add_argument(
         "--provider",
