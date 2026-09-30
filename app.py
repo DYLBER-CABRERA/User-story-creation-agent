@@ -126,6 +126,15 @@ with st.sidebar:
             "o no alcanzar el contexto; si falla, reduce cantidades o sube `OLLAMA_NUM_CTX`."
         )
 
+    st.subheader("Depuración")
+    debug_prompt = st.checkbox(
+        "Imprimir prompt exacto y tiempos en la terminal",
+        value=False,
+        help="Al generar, imprime en la terminal donde corre `streamlit run` el prompt "
+             "completo que va al LLM (contexto ya interpolado) y el tiempo de cada "
+             "intento. Igual que --debug-prompt en la CLI.",
+    )
+
 # ───────────────────────── página principal ─────────────────────────
 st.title("🚌 Generador de Historias de Usuario")
 st.caption("LangChain · Pydantic · Ollama local o Gemini API, con respaldo automático")
@@ -150,6 +159,7 @@ if st.button("Generar historias", type="primary", disabled=not proveedores):
                 app_name=app_name,
                 context=contexto,
                 chain=chain,
+                debug=debug_prompt,
             )
             st.session_state.historias = historias
             st.session_state.segundos = segundos
