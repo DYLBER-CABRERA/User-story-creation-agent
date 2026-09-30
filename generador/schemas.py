@@ -5,7 +5,8 @@ de un mismo rol. Si el LLM repite, Pydantic rechaza la salida y el `with_retry` 
 generar.py fuerza un reintento en vez de dejar pasar historias repetidas.
 
 Cada historia incluye (según la guía del Specification Agent):
-- flujo_normal / flujo_alternativo  (sección 2.3: camino exitoso y sus alternativas)
+- flujo_normal / flujo_alternativo / flujo_excepcion
+  (sección 2.3: camino exitoso, alternativas válidas y excepciones por fallo)
 - criterios Dado/Cuando/Entonces    (sección 2.5: criterios de aceptación verificables)
 """
 from __future__ import annotations
@@ -36,7 +37,14 @@ class HistoriaUsuario(BaseModel):
     )
     flujo_alternativo: list[str] = Field(
         min_length=1,
-        description="Al menos un caso alternativo o de excepción, ej: ['no hay resultados', 'el sistema informa que no hay rutas']",
+        description="Al menos 1 alternativa válida (sin resultados, cancelación, dato inválido), "
+                    "ej: ['no hay resultados', 'el sistema informa que no hay rutas']",
+    )
+    flujo_excepcion: list[str] = Field(
+        min_length=1,
+        description="Al menos 1 excepción por fallo con su manejo (sin conexión, servicio no "
+                    "disponible, timeout), ej: ['la app pierde la conexión', 'el sistema muestra un "
+                    "aviso y reintenta']",
     )
     criterios: list["CriterioAceptacion"] = Field(
         min_length=1,
@@ -51,7 +59,8 @@ class HistoriaUsuario(BaseModel):
     def detalle(self) -> str:
         """Historia completa con flujos y criterios (para exportación y consola)."""
         lineas = [self.texto, "  Flujo normal: " + " -> ".join(self.flujo_normal),
-                  "  Flujo alternativo: " + " -> ".join(self.flujo_alternativo)]
+                  "  Flujo alternativo: " + " -> ".join(self.flujo_alternativo),
+                  "  Flujo de excepción: " + " -> ".join(self.flujo_excepcion)]
         lineas.extend(f"  CA-{i}: {c.texto}" for i, c in enumerate(self.criterios, 1))
         return "\n".join(lineas)
 

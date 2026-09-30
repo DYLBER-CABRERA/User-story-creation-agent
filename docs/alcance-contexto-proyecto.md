@@ -116,7 +116,6 @@ Facilitar la movilidad de los pasajeros de buseta en Manizales.
 * Aplicación funcional con todas las funcionalidades **Imprescindibles** demostrables.
 * Historias de usuario bien construidas (formato estándar, INVEST) para los tres
   roles.
-* Informe del proyecto y video de sustentación.
 
 ## 12. Equipo y plazo
 

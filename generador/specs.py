@@ -321,11 +321,12 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
     """Contexto para el LLM del generador de historias, construido desde el
     documento de alcance (fuente única de verdad) en lugar de texto hardcodeado.
 
-    Incluye §1 problema, §2 solución, §5 alcances, §6 fuera de alcance,
-    §7 reglas de negocio y §9 roles, más las decisiones humanas ya resueltas
-    (control.json). Excluye §10 preguntas abiertas y §12 equipo/plazo: las
+    Incluye §1 problema, §2 solución, §3 objetivos, §4 público, §5 alcances,
+    §6 fuera de alcance, §7 reglas de negocio, §8 priorización y §9 roles, más
+    las decisiones humanas ya resueltas (control.json). Excluye §10 preguntas
+    abiertas y §11-§13 (entregables, equipo/plazo, párrafo de contexto): las
     decisiones pendientes no se le pasan al modelo (guía §8: no debe inventar
-    valores) y el planning no aporta a las historias. ~3 KB, seguro para la
+    valores) y el planning no aporta a las historias. ~4.3 KB, seguro para la
     ventana de 8192 tokens de qwen2.5:3b."""
     secciones = _leer_alcance(alcance_path)
     if not secciones:
@@ -335,9 +336,12 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
     bloques = [
         ("PROBLEMA", _sec(secciones, 1)),
         ("SOLUCIÓN", _sec(secciones, 2)),
+        ("OBJETIVOS", _sec(secciones, 3)),
+        ("PÚBLICO OBJETIVO", _sec(secciones, 4)),
         ("ALCANCES — SOLO ESTAS FUNCIONALIDADES", _sec(secciones, 5)),
         ("FUERA DE ALCANCE — NUNCA INVENTES NADA DE ESTO", _sec(secciones, 6)),
         ("REGLAS DE NEGOCIO — RESPÉTALAS EN FLUJOS Y CRITERIOS", _sec(secciones, 7)),
+        ("PRIORIZACIÓN", _sec(secciones, 8)),
         ("ROLES", _sec(secciones, 9)),
     ]
     partes = [
@@ -571,8 +575,10 @@ def _construir_markdown(
         rf_id = f"RF-{n:03d}-{rf_seq:02d}"
         rf_lineas.append(f"- **{rf_id}** [{h.id}] Como {h.como}, quiero {h.quiero}, para {h.para}.")
         flujo_norm.append(f"- **{h.id}:** {' → '.join(h.flujo_normal)}")
-        flujo_alt.append(f"- **{h.id}:** {' → '.join(h.flujo_alternativo)}")
-        limite.extend(f"- **{h.id}:** {paso}" for paso in h.flujo_alternativo)
+        flujo_alt.append(f"- **{h.id} (alternativo):** {' → '.join(h.flujo_alternativo)}")
+        flujo_alt.append(f"- **{h.id} (excepción):** {' → '.join(h.flujo_excepcion)}")
+        limite.extend(f"- **{h.id}:** {paso}"
+                      for paso in (*h.flujo_alternativo, *h.flujo_excepcion))
         ac_ids = []
         for j, c in enumerate(h.criterios, start=1):
             ac_seq += 1

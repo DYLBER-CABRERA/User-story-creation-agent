@@ -105,12 +105,13 @@ Markdown de cada una y un botón para descargarlas todas en `.zip`.
 
 El campo "Contexto del proyecto" se **prellena desde `docs/alcance-contexto-proyecto.md`**
 (fuente única de verdad) — en consola y en la app — con: §1 problema, §2 solución,
-§5 alcances, §6 fuera de alcance, §7 reglas de negocio, §9 roles y las decisiones
-humanas ya respondidas de `control.json` (~3.4 KB, seguro para `OLLAMA_NUM_CTX=8192`).
+§3 objetivos, §4 público, §5 alcances, §6 fuera de alcance, §7 reglas de negocio,
+§8 priorización, §9 roles y las decisiones humanas ya respondidas de `control.json`
+(~4.3 KB, seguro para `OLLAMA_NUM_CTX=8192`).
 Se excluyen §10 preguntas abiertas (decisiones pendientes: pasarlas al modelo lo
-invitaría a inventar valores, guía §8) y §12 equipo/plazo (irrelevante para historias).
-Sigue siendo editable a mano; `CONTEXT_DEFAULT` queda solo como respaldo si el
-documento no existe.
+invitaría a inventar valores, guía §8) y §11-§13 (entregables, equipo/plazo,
+párrafo redundante). Sigue siendo editable a mano; `CONTEXT_DEFAULT` queda solo
+como respaldo si el documento no existe.
 
 ### Especificaciones (SPEC)
 
@@ -156,7 +157,8 @@ aprobar queda deshabilitado mientras queden preguntas sin responder.
 ```
 generador/
   config.py     Variables de entorno
-  schemas.py    Pydantic: historia con flujos, criterios Dado/Cuando/Entonces y sin repetidos
+  schemas.py    Pydantic: historia con flujos (normal, alternativo y excepción),
+                criterios Dado/Cuando/Entonces y sin repetidos
   temas.py      Temas obligatorios por rol, tomados del documento de Alcances
   prompts.py    Prompt con reglas INVEST, flujos y criterios de aceptación
   llm.py        Construye Ollama/Gemini con orden y modelo elegibles (fallback)

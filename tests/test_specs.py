@@ -49,6 +49,8 @@ def test_spec_con_historias_incluye_rf_flujos_ac_y_trazabilidad():
     assert "AC-001-01" in spec1.markdown
     assert "Dado" in spec1.markdown                 # criterios Dado/Cuando/Entonces
     assert "Flujo" in spec1.markdown
+    assert "(alternativo)" in spec1.markdown        # §9 distingue alternativa y excepción
+    assert "(excepción)" in spec1.markdown
     assert "| HU-P01 | RF-001-01" in spec1.markdown  # tabla §16
     # SPEC sin historias en esta corrida -> pendiente
     spec8 = next(d for d in docs if d.num == 8)
@@ -230,9 +232,12 @@ def test_contexto_para_el_llm_sale_del_alcance():
     control = _control_vacio()
     ctx = contexto_proyecto(control=control)
     assert "[PROBLEMA]" in ctx and "[SOLUCIÓN]" in ctx
+    assert "[OBJETIVOS]" in ctx and "movilidad de los pasajeros" in ctx
+    assert "[PÚBLICO OBJETIVO]" in ctx and "Estudiantes" in ctx
     assert "[ALCANCES" in ctx and "Consulta de rutas" in ctx
     assert "FUERA DE ALCANCE" in ctx and "Pago de pasajes" in ctx
     assert "REGLAS DE NEGOCIO" in ctx and "BR-01" in ctx
+    assert "[PRIORIZACIÓN]" in ctx and "Imprescindible" in ctx
     assert "[ROLES]" in ctx and "Administrador" in ctx
     # las decisiones pendientes (§10) NO se filtran al modelo: no debe inventar
     assert "OPEN-Q-" not in ctx

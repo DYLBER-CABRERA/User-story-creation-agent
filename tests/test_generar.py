@@ -15,6 +15,7 @@ def mk(i, rol, pfx, quiero=None):
         para="lograr un beneficio",
         flujo_normal=[f"{rol.lower()} realiza la acción", "el sistema responde con el resultado"],
         flujo_alternativo=[f"{rol.lower()} no tiene resultados", "el sistema informa el motivo"],
+        flujo_excepcion=[f"falla el servicio para {rol.lower()}", "el sistema muestra un aviso reintentable"],
         criterios=[CriterioAceptacion(
             dado=f"el {rol.lower()} está en la app",
             cuando=f"el {rol.lower()} ejecuta la acción {i}",
@@ -66,7 +67,7 @@ def test_formato_texto():
 
 
 def test_historia_exige_flujos_y_criterios():
-    """Sin flujo_normal / flujo_alternativo / criterios, Pydantic rechaza la historia."""
+    """Sin flujo_normal / flujo_alternativo / flujo_excepcion / criterios, Pydantic rechaza."""
     with pytest.raises(ValidationError):
         HistoriaUsuario(id="HU-P01", rol="Pasajero", como="pasajero",
                         quiero="ver rutas", para="saber cuáles hay")
@@ -74,6 +75,8 @@ def test_historia_exige_flujos_y_criterios():
         HistoriaUsuario(**{**mk(1, "Pasajero", "P").model_dump(), "criterios": []})
     with pytest.raises(ValidationError):
         HistoriaUsuario(**{**mk(1, "Pasajero", "P").model_dump(), "flujo_normal": []})
+    with pytest.raises(ValidationError):
+        HistoriaUsuario(**{**mk(1, "Pasajero", "P").model_dump(), "flujo_excepcion": []})
 
 
 def test_criterio_formato_dado_cuando_entonces():
@@ -88,6 +91,7 @@ def test_detalle_incluye_flujos_y_criterios():
     h = mk(1, "Pasajero", "P")
     assert "Flujo normal:" in h.detalle
     assert "Flujo alternativo:" in h.detalle
+    assert "Flujo de excepción:" in h.detalle
     assert "CA-1:" in h.detalle
     assert "Dado" in h.detalle
 

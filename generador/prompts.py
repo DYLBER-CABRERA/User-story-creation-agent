@@ -2,7 +2,7 @@
 
 Requisitos del Specification Agent (guía del profesor) aplicados al prompt:
 - Formato INVEST estricto (sección 2.3 y reglas de historias ágiles).
-- Flujo normal + flujo alternativo por historia (sección 2.3).
+- Flujo normal + flujo alternativo + excepción por historia (sección 2.3).
 - Criterios de aceptación Dado/Cuando/Entonces, observables y verificables
   (secciones 2.5 y 2.9: Specification by Example / Given-When-Then).
 
@@ -34,8 +34,10 @@ Reglas estrictas:
 - Cada historia DEBE traer:
   * flujo_normal: 2 a 4 pasos cortos del camino exitoso
     ("usuario -> acción -> sistema -> resultado").
-  * flujo_alternativo: al menos 1 caso alternativo o de excepción (sin resultados,
-    error, cancelación, servicio no disponible, etc.).
+  * flujo_alternativo: al menos 1 alternativa VÁLIDA (sin resultados,
+    cancelación, dato inválido, el usuario se sale).
+  * flujo_excepcion: al menos 1 excepción por FALLO y su manejo
+    (servicio no disponible, sin conexión, timeout, error del sistema).
   * criterios: 1 o 2 criterios de aceptación en tres campos (dado / cuando / entonces).
     Deben ser concretos, observables y verificables: sin ambigüedad (nada de "rápido"
     sin número) y coherentes con el contexto; si un dato no está definido, usa un
@@ -63,6 +65,6 @@ GENERATE_PROMPT = ChatPromptTemplate.from_messages(
     [
         ("system", SYSTEM),
         ("human", "Genera ahora las historias en el formato JSON indicado, una por cada tema listado, "
-                  "con su flujo normal, su flujo alternativo y sus criterios de aceptación."),
+                  "con su flujo normal, su flujo alternativo, su flujo de excepción y sus criterios de aceptación."),
     ]
 )

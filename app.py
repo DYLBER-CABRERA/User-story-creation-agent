@@ -43,6 +43,7 @@ def to_dataframe(historias: HistoriasGeneradas) -> pd.DataFrame:
             "ID": h.id, "Rol": h.rol, "Como": h.como, "Quiero": h.quiero, "Para": h.para,
             "Flujo normal": " → ".join(h.flujo_normal),
             "Flujo alternativo": " → ".join(h.flujo_alternativo),
+            "Flujo excepción": " → ".join(h.flujo_excepcion),
             "Criterios de aceptación": " | ".join(c.texto for c in h.criterios),
         }
         for h in historias.todas()
@@ -177,6 +178,7 @@ if historias:
                 st.markdown(
                     f"- *Flujo normal:* {' → '.join(h.flujo_normal)}\n"
                     f"- *Flujo alternativo:* {' → '.join(h.flujo_alternativo)}\n"
+                    f"- *Flujo de excepción:* {' → '.join(h.flujo_excepcion)}\n"
                     + "\n".join(f"- *CA-{i}:* {c.texto}" for i, c in enumerate(h.criterios, 1))
                 )
 
