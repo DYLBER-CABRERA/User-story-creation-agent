@@ -5,6 +5,7 @@
     python -m generador.cli --provider gemini --model gemini-2.5-flash
     python -m generador.cli --spec all --json historias.json
     python -m generador.cli --spec rutas            # solo SPEC-001
+    python -m generador.cli --debug-prompt          # prompt exacto + tiempo por intento
 """
 from __future__ import annotations
 
@@ -60,6 +61,11 @@ def main() -> int:
         metavar="ARCHIVO",
         help="Guarda las historias generadas en JSON (para python -m generador.specs --historias ...)",
     )
+    ap.add_argument(
+        "--debug-prompt",
+        action="store_true",
+        help="Imprime en stderr el prompt exacto que se envía al modelo y el tiempo de cada intento",
+    )
     args = ap.parse_args()
 
     order = ("ollama", "gemini") if args.provider == "ollama" else ("gemini", "ollama")
@@ -75,6 +81,7 @@ def main() -> int:
             context=args.context,
             order=order,
             modelos={args.provider: modelo},
+            debug=args.debug_prompt,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Error: {exc}", file=sys.stderr)

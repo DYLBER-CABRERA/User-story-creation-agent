@@ -72,6 +72,10 @@ python -m generador.cli --app "Mi App" --context "Descripción del proyecto..."
 python -m generador.cli --provider ollama --model phi3:mini
 python -m generador.cli --provider gemini --model gemini-2.5-flash
 
+# Depurar: imprime en stderr el prompt EXACTO que va al modelo (contexto ya
+# interpolado) y el tiempo de cada intento + el total
+python -m generador.cli --pasajero 2 --conductor 1 --administrador 1 --debug-prompt
+
 # SPECs (especificaciones por funcionalidad, guía del Specification Agent)
 python -m generador.cli --spec all --json historias.json   # genera y exporta las 12 SPECs
 python -m generador.cli --spec rutas                       # solo SPEC-001

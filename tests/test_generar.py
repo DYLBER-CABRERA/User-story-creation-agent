@@ -61,6 +61,25 @@ def test_genera_cantidades_exactas():
     assert secs >= 0
 
 
+def test_debug_prompt_imprime_prompt_y_tiempos(capsys):
+    """--debug-prompt: el prompt exacto (contexto ya interpolado) y el tiempo por intento."""
+    from generador.prompts import GENERATE_PROMPT
+    chain = GENERATE_PROMPT | FakeLLM([historias_ok()]).with_structured_output(HistoriasGeneradas)
+    generar_historias(chain=chain, debug=True)
+    err = capsys.readouterr().err
+    assert "PROMPT EXACTO" in err
+    assert "Contexto de la app:" in err            # contexto del alcance, ya interpolado
+    assert "----- system" in err and "----- human" in err
+    assert "[intento 1] respuesta del modelo en " in err
+    assert "conteos ok" in err
+    assert "FIN PROMPT" in err
+
+    # sin debug no imprime nada (la terminal se queda limpia)
+    chain2 = GENERATE_PROMPT | FakeLLM([historias_ok()]).with_structured_output(HistoriasGeneradas)
+    generar_historias(chain=chain2)
+    assert capsys.readouterr().err == ""
+
+
 def test_formato_texto():
     h = mk(1, "Pasajero", "P")
     assert h.texto == "HU-P01: Como pasajero, quiero hacer algo 1, para lograr un beneficio."

@@ -14,6 +14,7 @@ Pensado para modelos locales de Ollama:
 """
 from __future__ import annotations
 
+import sys
 import time
 
 from langchain_core.exceptions import OutputParserException
@@ -88,6 +89,7 @@ def generar_historias(
     chain: Runnable | None = None,
     order: tuple[str, ...] | list[str] | None = None,
     modelos: dict[str, str] | None = None,
+    debug: bool = False,
 ) -> tuple[HistoriasGeneradas, float]:
     s = settings or get_settings()
     if context is None:
@@ -106,16 +108,34 @@ def generar_historias(
         "temas_conductor": formatear(temas_para("conductor", n_conductor)),
         "temas_administrador": formatear(temas_para("administrador", n_admin)),
     }
+    if debug:
+        mensajes = GENERATE_PROMPT.format_messages(**payload)
+        total = sum(len(m.content) for m in mensajes)
+        print(
+            f"===== PROMPT EXACTO — {len(mensajes)} mensaje(s), {total} caracteres =====",
+            file=sys.stderr,
+        )
+        for msg in mensajes:
+            print(f"\n----- {msg.type} ({len(msg.content)} caracteres) -----",
+                  file=sys.stderr)
+            print(msg.content, file=sys.stderr)
+        print("\n===== FIN PROMPT =====", file=sys.stderr)
     t0 = time.perf_counter()
     out: HistoriasGeneradas | None = None
     problema: str | None = None
-    for _ in range(MAX_INTENTOS):
+    for intento in range(1, MAX_INTENTOS + 1):
+        t1 = time.perf_counter()
         out = chain.invoke(payload)
         if isinstance(out, dict):
             out = HistoriasGeneradas.model_validate(out)
         # Exigimos las cantidades pedidas: si el modelo vino corto, se reintenta
         # (los modelos locales a veces "se rinden" a mitad del JSON).
         problema = _problema_conteos(out, n_pasajero, n_conductor, n_admin)
+        if debug:
+            dt = time.perf_counter() - t1
+            estado = "conteos ok" if problema is None else f"reintento por conteos ({problema})"
+            print(f"[intento {intento}] respuesta del modelo en {dt:.1f} s — {estado}",
+                  file=sys.stderr)
         if problema is None:
             break
     else:
