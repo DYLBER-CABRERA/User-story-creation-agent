@@ -1,9 +1,9 @@
-# Generador de Historias de Usuario (Ollama local o Gemini API)
+# Generador de Historias de Usuario (Ollama local, Gemini o Groq API)
 
 Genera historias de usuario listas para backlog: 6 para pasajero, 5 para conductor,
 4 para administrador (cantidades configurables). Puedes elegir en el programa si
-conecta a **tu modelo local de Ollama** o a la **API de Gemini**, con respaldo
-automático al otro proveedor si el principal falla.
+conecta a **tu modelo local de Ollama**, a la **API de Gemini** o a la **API de Groq**,
+con respaldo automático al siguiente proveedor si el principal falla.
 
 ## Por qué ya no se repiten las historias
 
@@ -16,8 +16,8 @@ historia con distinto ID. Dos capas lo evitan:
    las historias dentro del alcance de BusetasApp (nada de pagos, reservas, etc.).
 2. **Validación con Pydantic + reintento automático**: `HistoriasGeneradas` rechaza
    cualquier salida con dos historias repetidas en el mismo rol; si el modelo repite,
-   `with_retry` fuerza un segundo intento antes de rendirse (y si hay Gemini
-   configurado, `with_fallbacks` prueba con él después).
+   `with_retry` fuerza un segundo intento antes de rendirse (y si hay Gemini o Groq
+   configurado, `with_fallbacks` prueba con el siguiente proveedor).
 
 ## Por qué es rápido
 
@@ -31,8 +31,8 @@ historia con distinto ID. Dos capas lo evitan:
 4. **Prompt compacto**, sin ejemplos largos ni razonamiento pedido: solo reglas y
    formato. Los modelos locales chicos son más rápidos (y más precisos) con
    instrucciones cortas y directas.
-5. **Respaldo a Gemini opcional** vía `with_fallbacks`, solo si configuras
-   `GOOGLE_API_KEY`; si no, el sistema usa solo Ollama.
+5. **Respaldo a Gemini/Groq opcional** vía `with_fallbacks`, solo si configuras
+   `GOOGLE_API_KEY` o `GROQ_API_KEY`; si no, el sistema usa solo los disponibles.
 
 ## Instalación
 
@@ -68,9 +68,10 @@ python -m generador.cli --out historias.txt  # además, guarda el resultado en u
 python -m generador.cli --pasajero 8 --conductor 3 --administrador 5
 python -m generador.cli --app "Mi App" --context "Descripción del proyecto..."
 
-# Elegir proveedor principal y modelo (el otro queda de respaldo)
+# Elegir proveedor principal y modelo (los otros quedan de respaldo)
 python -m generador.cli --provider ollama --model phi3:mini
 python -m generador.cli --provider gemini --model gemini-2.5-flash
+python -m generador.cli --provider groq --model qwen/qwen3.8-27b
 
 # Depurar: imprime en stderr el prompt EXACTO que va al modelo (contexto ya
 # interpolado) y el tiempo de cada intento + el total
@@ -93,12 +94,14 @@ ajustar `OLLAMA_NUM_PREDICT`.
 streamlit run app.py
 ```
 Abre http://localhost:8501. En la barra lateral eliges el **proveedor**
-(`🟢 Ollama (local)` o `✨ Gemini (API)`) y el **modelo** a usar (prellenado con el
-del `.env`, editable); el otro proveedor queda como respaldo automático. También
+(`🟢 Ollama (local)`, `✨ Gemini (API)` o `⚡ Groq (API)`) y el **modelo** a usar
+(prellenado con el del `.env`, editable); los otros proveedores quedan como
+respaldo automático. También
 defines el nombre de la app, el contexto y cuántas historias quieres por rol; el
 botón "Generar historias" hace la única llamada al modelo y muestra el resultado en
 pestañas por rol, una tabla completa y botones para descargar en `.txt` o `.csv`.
-Si no hay ningún proveedor configurado (ni Ollama corriendo ni `GOOGLE_API_KEY`),
+Si no hay ningún proveedor configurado (ni Ollama corriendo ni `GOOGLE_API_KEY` ni
+`GROQ_API_KEY`),
 el botón queda deshabilitado y se explica el motivo arriba.
 
 Después de generar aparece la sección **Especificaciones (SPEC)**: un botón que
@@ -178,7 +181,7 @@ generador/
                 criterios Dado/Cuando/Entonces y sin repetidos
   temas.py      Temas obligatorios por rol, tomados del documento de Alcances
   prompts.py    Prompt con reglas INVEST, flujos y criterios de aceptación
-  llm.py        Construye Ollama/Gemini con orden y modelo elegibles (fallback)
+  llm.py        Construye Ollama/Gemini/Groq con orden y modelo elegibles (fallback)
   generar.py    Arma la cadena (json_schema + retry + fallback) y ejecuta UNA llamada
   specs.py      Catálogo de 12 SPECs y ensamblador de las 17 secciones (script propio)
   cli.py        Interfaz de consola (--spec / --json)

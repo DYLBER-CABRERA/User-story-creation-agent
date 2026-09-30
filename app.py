@@ -27,14 +27,25 @@ from generador.specs import (
 st.set_page_config(page_title="Generador de Historias de Usuario", page_icon="🚌", layout="wide")
 
 SETTINGS = get_settings()
-PROVIDER_LABELS = {"ollama": "🟢 Ollama (local)", "gemini": "✨ Gemini (API)"}
+OPCIONES = ("ollama", "gemini", "groq")
+PROVIDER_LABELS = {
+    "ollama": "🟢 Ollama (local)",
+    "gemini": "✨ Gemini (API)",
+    "groq": "⚡ Groq (API)",
+}
+
+
+def orden_de(proveedor: str) -> tuple[str, ...]:
+    """El elegido primero; los demás quedan como respaldo en orden."""
+    return (proveedor,) + tuple(p for p in OPCIONES if p != proveedor)
 
 
 @st.cache_resource(show_spinner=False)
 def get_chain(proveedor: str, modelo: str):
     """Cadena cacheada por (proveedor, modelo): cambiar cualquiera de los dos la reconstruye."""
-    order = ("ollama", "gemini") if proveedor == "ollama" else ("gemini", "ollama")
-    return build_chain(build_providers(SETTINGS, order=order, modelos={proveedor: modelo}))
+    return build_chain(
+        build_providers(SETTINGS, order=orden_de(proveedor), modelos={proveedor: modelo})
+    )
 
 
 def to_dataframe(historias: HistoriasGeneradas) -> pd.DataFrame:
@@ -71,12 +82,20 @@ with st.sidebar:
     st.subheader("Proveedor")
     proveedor = st.radio(
         "Conectar con",
-        options=["ollama", "gemini"],
+        options=list(OPCIONES),
         format_func=lambda p: PROVIDER_LABELS[p],
         horizontal=True,
-        index=0 if SETTINGS.provider_order[:1] != ("gemini",) else 1,
+        index=(
+            OPCIONES.index(SETTINGS.provider_order[0])
+            if SETTINGS.provider_order and SETTINGS.provider_order[0] in OPCIONES
+            else 0
+        ),
     )
-    modelo_default = SETTINGS.ollama_model if proveedor == "ollama" else SETTINGS.gemini_model
+    modelo_default = {
+        "ollama": SETTINGS.ollama_model,
+        "gemini": SETTINGS.gemini_model,
+        "groq": SETTINGS.groq_model,
+    }[proveedor]
     modelo = st.text_input(
         "Modelo",
         value=modelo_default,
@@ -84,7 +103,7 @@ with st.sidebar:
         help="Modelo a usar en el proveedor elegido. El otro proveedor queda como respaldo con su modelo del .env.",
     )
 
-    order = ("ollama", "gemini") if proveedor == "ollama" else ("gemini", "ollama")
+    order = orden_de(proveedor)
     try:
         proveedores = [n for n, _ in build_providers(SETTINGS, order=order, modelos={proveedor: modelo})]
     except Exception:
@@ -97,13 +116,16 @@ with st.sidebar:
         else:
             st.success(f"Usará únicamente: {etiqueta}")
         if primario != proveedor:
+            motivo = {
+                "gemini": "(falta GOOGLE_API_KEY)",
+                "groq": "(falta GROQ_API_KEY)",
+            }.get(proveedor, "(error de configuración)")
             st.warning(
                 f"{PROVIDER_LABELS[proveedor]} no está disponible "
-                f"{'(falta GOOGLE_API_KEY)' if proveedor == 'gemini' else '(error de configuración)'}; "
-                f"se usará {PROVIDER_LABELS.get(primario, primario)}."
+                f"{motivo}; se usará {PROVIDER_LABELS.get(primario, primario)}."
             )
     else:
-        st.error("No hay proveedores configurados. Revisa Ollama o GOOGLE_API_KEY en .env")
+        st.error("No hay proveedores configurados. Revisa Ollama, GOOGLE_API_KEY o GROQ_API_KEY en .env")
 
     app_name = st.text_input("Nombre de la app", APP_NAME_DEFAULT)
     contexto = st.text_area(
@@ -137,7 +159,7 @@ with st.sidebar:
 
 # ───────────────────────── página principal ─────────────────────────
 st.title("🚌 Generador de Historias de Usuario")
-st.caption("LangChain · Pydantic · Ollama local o Gemini API, con respaldo automático")
+st.caption("LangChain · Pydantic · Ollama local, Gemini o Groq API, con respaldo automático")
 
 if "historias" not in st.session_state:
     st.session_state.historias = None
@@ -146,9 +168,11 @@ if "historias" not in st.session_state:
 
 if st.button("Generar historias", type="primary", disabled=not proveedores):
     primario = proveedores[0] if proveedores else proveedor
-    modelo_primario = modelo if primario == proveedor else (
-        SETTINGS.ollama_model if primario == "ollama" else SETTINGS.gemini_model
-    )
+    modelo_primario = modelo if primario == proveedor else {
+        "ollama": SETTINGS.ollama_model,
+        "gemini": SETTINGS.gemini_model,
+        "groq": SETTINGS.groq_model,
+    }[primario]
     with st.spinner(f"Generando con {primario} ({modelo_primario})…"):
         try:
             chain = get_chain(proveedor, modelo)

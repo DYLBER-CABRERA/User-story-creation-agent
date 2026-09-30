@@ -1,4 +1,4 @@
-"""Proveedores LLM: Ollama local (todo en GPU, sin tope de salida por defecto) y Gemini."""
+"""Proveedores LLM: Ollama local, Gemini API y Groq API (con respaldo automático)."""
 from __future__ import annotations
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -55,6 +55,21 @@ def build_providers(
                     ChatGoogleGenerativeAI(
                         model=modelos.get("gemini", s.gemini_model),
                         google_api_key=s.google_api_key,
+                        temperature=s.temperature,
+                    ),
+                )
+            )
+        elif name == "groq":
+            if not s.groq_api_key:
+                continue
+            from langchain_groq import ChatGroq
+
+            providers.append(
+                (
+                    "groq",
+                    ChatGroq(
+                        model=modelos.get("groq", s.groq_model),
+                        api_key=s.groq_api_key,
                         temperature=s.temperature,
                     ),
                 )

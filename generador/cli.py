@@ -21,10 +21,10 @@ from .specs import construir_specs, contexto_proyecto, escribir_specs, seleccion
 def main() -> int:
     s = get_settings()
     default_provider = s.provider_order[0] if s.provider_order else "ollama"
-    if default_provider not in ("ollama", "gemini"):
+    if default_provider not in ("ollama", "gemini", "groq"):
         default_provider = "ollama"
 
-    ap = argparse.ArgumentParser(description="Genera historias de usuario con Ollama o Gemini (con respaldo automático)")
+    ap = argparse.ArgumentParser(description="Genera historias de usuario con Ollama, Gemini o Groq (con respaldo automático)")
     ap.add_argument("--pasajero", type=int, default=6)
     ap.add_argument("--conductor", type=int, default=5)
     ap.add_argument("--administrador", type=int, default=4)
@@ -37,9 +37,9 @@ def main() -> int:
     ap.add_argument("--out", help="Archivo .txt donde guardar el resultado (además de imprimirlo)")
     ap.add_argument(
         "--provider",
-        choices=["ollama", "gemini"],
+        choices=["ollama", "gemini", "groq"],
         default=default_provider,
-        help=f"Proveedor principal (respaldo: el otro). Por defecto: {default_provider}",
+        help=f"Proveedor principal (respaldo: los otros). Por defecto: {default_provider}",
     )
     ap.add_argument(
         "--model",
@@ -68,8 +68,14 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    order = ("ollama", "gemini") if args.provider == "ollama" else ("gemini", "ollama")
-    modelo = args.model or (s.ollama_model if args.provider == "ollama" else s.gemini_model)
+    order = (args.provider,) + tuple(
+        p for p in ("ollama", "gemini", "groq") if p != args.provider
+    )
+    modelo = args.model or {
+        "ollama": s.ollama_model,
+        "gemini": s.gemini_model,
+        "groq": s.groq_model,
+    }[args.provider]
 
     print(f"Generando con {args.provider} ({modelo})…", file=sys.stderr)
     try:

@@ -10,7 +10,8 @@ Pensado para modelos locales de Ollama:
 - Validación de cantidades -> si el modelo devuelve menos historias de las pedidas,
   se reintenta; si persiste, error explícito (nunca se entregan listas cortas en silencio).
 - with_retry -> si Pydantic detecta historias repetidas o mal formadas, reintenta antes
-  de rendirse; with_fallbacks -> si Ollama no responde, pasa a Gemini (si hay clave).
+  de rendirse; with_fallbacks -> si el principal no responde, pasa al siguiente
+  (Gemini o Groq, si hay clave).
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ from .temas import formatear, temas_para
 APP_NAME_DEFAULT = "BusetasApp Manizales"
 CONTEXT_DEFAULT = (
     "BusetasApp es una aplicación para consultar las rutas de las busetas de Manizales: "
-    "catálogo de rutas con recorrido en mapa y paradas, horarios y días de operación "
+    "Rutas con recorrido en mapa y paradas, horarios y días de operación "
     "(lunes a viernes, sábados, domingos y festivos), ubicación de las busetas en tiempo "
     "real con tiempo estimado de llegada (ETA) a una parada, planificación de viaje con "
     "origen y destino, y búsqueda por número o nombre de ruta, barrio o punto de interés. "
@@ -46,7 +47,9 @@ CONTEXT_DEFAULT = (
 def build_chain(providers: list[tuple[str, object]] | None = None) -> Runnable:
     provs = providers if providers is not None else build_providers()
     if not provs:
-        raise RuntimeError("No hay proveedores LLM disponibles. Configura Ollama o GOOGLE_API_KEY.")
+        raise RuntimeError(
+            "No hay proveedores LLM disponibles. Configura Ollama, GOOGLE_API_KEY o GROQ_API_KEY."
+        )
     branches = []
     for _, llm in provs:
         branch = GENERATE_PROMPT | llm.with_structured_output(HistoriasGeneradas)

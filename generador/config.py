@@ -16,6 +16,8 @@ class Settings:
     ollama_num_predict: int
     google_api_key: str
     gemini_model: str
+    groq_api_key: str
+    groq_model: str
     provider_order: tuple[str, ...]
     temperature: float
 
@@ -29,8 +31,12 @@ def get_settings() -> Settings:
         ollama_num_predict=int(os.getenv("OLLAMA_NUM_PREDICT", "-1")),
         google_api_key=os.getenv("GOOGLE_API_KEY", "").strip(),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        groq_api_key=os.getenv("GROQ_API_KEY", "").strip(),
+        groq_model=os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
         provider_order=tuple(
-            p.strip().lower() for p in os.getenv("PROVIDER_ORDER", "ollama,gemini").split(",") if p.strip()
+            p.strip().lower()
+            for p in os.getenv("PROVIDER_ORDER", "ollama,gemini,groq").split(",")
+            if p.strip()
         ),
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.4")),
     )
