@@ -224,27 +224,44 @@ if historias:
     pendientes = preguntas_pendientes(control, spec_num=doc_sel.num)
     with st.expander(f"Preguntas de SPEC-{doc_sel.num:03d} — {len(pendientes)} sin responder"):
         st.caption(
-            "Incluye las sugeridas por el agente (§5 pasos 5-6). "
-            "La guía §12 exige resolverlas todas antes de aprobar."
+            "Las cifras de RNF (segundos, %) usan campos numéricos; el resto, texto. "
+            "Incluye las sugeridas por el agente (§5 pasos 5-6): la guía §12 exige "
+            "resolverlas todas antes de aprobar."
         )
-        campos = [
-            (q, st.text_input(
-                f"{q['id']} — {q['pregunta']}" + ("  [sugerida]" if q.get("generada") else ""),
-                key=f"resp-{q['id']}-{len(pendientes)}",
-            ))
-            for q in pendientes
-        ]
+        campos = []
+        for q in pendientes:
+            etiqueta = (
+                f"{q['id']} — {q['pregunta']}"
+                + ("  [sugerida]" if q.get("generada") else "")
+            )
+            if q.get("campo") == "numero":
+                val = st.number_input(
+                    etiqueta,
+                    min_value=0.0,
+                    step=0.5 if q.get("unidad") == "s" else 1.0,
+                    value=None,
+                    key=f"resp-{q['id']}-{len(pendientes)}",
+                )
+                campos.append((q, val))
+            else:
+                campos.append((
+                    q,
+                    st.text_input(etiqueta, key=f"resp-{q['id']}-{len(pendientes)}"),
+                ))
         if st.button("Guardar respuestas"):
             guardadas = 0
             for q, texto in campos:
-                if texto.strip() and registrar_respuesta(control, q["id"], texto.strip(), "Web"):
+                if texto is None:
+                    continue
+                valor = texto.strip() if isinstance(texto, str) else f"{texto:g}"
+                if valor and registrar_respuesta(control, q["id"], valor, "Web"):
                     guardadas += 1
             if guardadas:
                 guardar_control(control)
                 st.success(f"{guardadas} respuesta(s) guardada(s).")
                 st.rerun()
             else:
-                st.warning("Escribe al menos una respuesta.")
+                st.warning("Escribe al menos una respuesta (o pon una cifra en los RNF).")
 
     # ── aprobación y congelación (guía §12) ──
     clave = f"{doc_sel.num:03d}"

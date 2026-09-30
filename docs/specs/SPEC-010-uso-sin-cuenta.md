@@ -43,18 +43,18 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 > **Pendiente:** sin historias asignadas en la corrida actual. Genere historias (app o CLI) y vuelva a exportar.
 
 ## 6. Requisitos no funcionales
-> Valores medibles definidos en `docs/alcance-contexto-proyecto.md` §14 (guía §8: las cifras las define el equipo; el agente no inventa).
+> Valores medibles por funcionalidad, definidos por el equipo en §15 (guía §8: el agente no inventa cifras). Las filas fijas de seguridad, integridad y compatibilidad vienen de `docs/alcance-contexto-proyecto.md` §14.
 
 | ID | Categoría | Requisito verificable | Valor |
 |----|-----------|----------------------|-------|
-| RNF-01 | Rendimiento | Las consultas principales (rutas, horarios, búsqueda) responden en un máximo de X segundos con N usuarios concurrentes | **[por definir]** |
-| RNF-02 | Rendimiento | La posición GPS y el ETA se actualizan como máximo cada X segundos durante el recorrido | **[por definir]** |
-| RNF-03 | Disponibilidad | El servicio está disponible al menos el X% del tiempo (ventana mensual) | **[por definir]** |
-| RNF-04 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
-| RNF-05 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
-| RNF-06 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
+| RNF-010-01 | Rendimiento | La respuesta de la consulta sin cuenta tarda como máximo [por definir] segundos bajo carga definida | **[por definir]** |
+| RNF-010-02 | Disponibilidad | El servicio que soporta la consulta sin cuenta debe estar disponible al menos el [por definir]% del tiempo (ventana mensual) | **[por definir]** |
+| RNF-010-03 | Actualización | La información mostrada por la consulta sin cuenta se actualiza como máximo cada [por definir] segundos | **[por definir]** |
+| RNF-01 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
+| RNF-02 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
+| RNF-03 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
 
-Valores **[por definir]** → decisión abierta **SUG-RNF** (§15): RNF-01, RNF-02, RNF-03.
+Valores **[por definir]** → decisiones abiertas en §15: SUG-010-RNF-01, SUG-010-RNF-02, SUG-010-RNF-03.
 
 ## 7. Reglas de negocio
 - **BR-01:** Cualquier persona puede consultar rutas, horarios y mapa sin crear una cuenta.
@@ -103,7 +103,9 @@ Sophia Cardona. Plazo: 8 semanas desde cero.
 
 **Preguntas sugeridas por el agente (§5 pasos 5-6):**
 
-- **SUG-RNF** — **Pendiente** (sugerida por el agente): Valores medibles de RNF sin definir en §14 del alcance (guía §8: el agente NO debe inventar cifras): RNF-01, RNF-02, RNF-03. ¿Cuál es el valor de cada uno (segundos, % de disponibilidad, etc.)?
+- **SUG-010-RNF-01** — **Pendiente** (sugerida por el agente): Tiempo máximo de respuesta de Uso sin cuenta — en segundos
+- **SUG-010-RNF-02** — **Pendiente** (sugerida por el agente): Disponibilidad mínima (ventana mensual) de Uso sin cuenta — en % de disponibilidad
+- **SUG-010-RNF-03** — **Pendiente** (sugerida por el agente): Cadencia máxima de actualización de Uso sin cuenta — en segundos
 - **SUG-010-CASOS** — **Pendiente** (sugerida por el agente): Casos límite sin analizar (§10) para Uso sin cuenta. ¿Qué casos deben especificarse (concurrencia, valores extremos, datos faltantes)?
 - **SUG-010-DEP** — **Pendiente** (sugerida por el agente): Dependencias pendientes (§12) para Uso sin cuenta. ¿Hay dependencias externas (datos, APIs, permisos)? Responder 'ninguna' si no aplica.
 

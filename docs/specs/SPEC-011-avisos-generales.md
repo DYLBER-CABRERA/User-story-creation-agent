@@ -43,18 +43,18 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 > **Pendiente:** sin historias asignadas en la corrida actual. Genere historias (app o CLI) y vuelva a exportar.
 
 ## 6. Requisitos no funcionales
-> Valores medibles definidos en `docs/alcance-contexto-proyecto.md` §14 (guía §8: las cifras las define el equipo; el agente no inventa).
+> Valores medibles por funcionalidad, definidos por el equipo en §15 (guía §8: el agente no inventa cifras). Las filas fijas de seguridad, integridad y compatibilidad vienen de `docs/alcance-contexto-proyecto.md` §14.
 
 | ID | Categoría | Requisito verificable | Valor |
 |----|-----------|----------------------|-------|
-| RNF-01 | Rendimiento | Las consultas principales (rutas, horarios, búsqueda) responden en un máximo de X segundos con N usuarios concurrentes | **[por definir]** |
-| RNF-02 | Rendimiento | La posición GPS y el ETA se actualizan como máximo cada X segundos durante el recorrido | **[por definir]** |
-| RNF-03 | Disponibilidad | El servicio está disponible al menos el X% del tiempo (ventana mensual) | **[por definir]** |
-| RNF-04 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
-| RNF-05 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
-| RNF-06 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
+| RNF-011-01 | Rendimiento | La respuesta de la publicación de avisos tarda como máximo [por definir] segundos bajo carga definida | **[por definir]** |
+| RNF-011-02 | Disponibilidad | El servicio que soporta la publicación de avisos debe estar disponible al menos el [por definir]% del tiempo (ventana mensual) | **[por definir]** |
+| RNF-011-03 | Actualización | La información mostrada por la publicación de avisos se actualiza como máximo cada [por definir] segundos | **[por definir]** |
+| RNF-01 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
+| RNF-02 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
+| RNF-03 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
 
-Valores **[por definir]** → decisión abierta **SUG-RNF** (§15): RNF-01, RNF-02, RNF-03.
+Valores **[por definir]** → decisiones abiertas en §15: SUG-011-RNF-01, SUG-011-RNF-02, SUG-011-RNF-03.
 
 ## 7. Reglas de negocio
 - **BR-04:** Solo el administrador publica avisos generales.
@@ -102,7 +102,9 @@ Sophia Cardona. Plazo: 8 semanas desde cero.
 
 **Preguntas sugeridas por el agente (§5 pasos 5-6):**
 
-- **SUG-RNF** — **Pendiente** (sugerida por el agente): Valores medibles de RNF sin definir en §14 del alcance (guía §8: el agente NO debe inventar cifras): RNF-01, RNF-02, RNF-03. ¿Cuál es el valor de cada uno (segundos, % de disponibilidad, etc.)?
+- **SUG-011-RNF-01** — **Pendiente** (sugerida por el agente): Tiempo máximo de respuesta de Avisos generales — en segundos
+- **SUG-011-RNF-02** — **Pendiente** (sugerida por el agente): Disponibilidad mínima (ventana mensual) de Avisos generales — en % de disponibilidad
+- **SUG-011-RNF-03** — **Pendiente** (sugerida por el agente): Cadencia máxima de actualización de Avisos generales — en segundos
 - **SUG-011-CASOS** — **Pendiente** (sugerida por el agente): Casos límite sin analizar (§10) para Avisos generales. ¿Qué casos deben especificarse (concurrencia, valores extremos, datos faltantes)?
 - **SUG-011-DEP** — **Pendiente** (sugerida por el agente): Dependencias pendientes (§12) para Avisos generales. ¿Hay dependencias externas (datos, APIs, permisos)? Responder 'ninguna' si no aplica.
 

@@ -64,9 +64,11 @@ def test_spec_sin_historias_marca_pendientes():
     docs = construir_specs(None, control=VACIO)
     d = docs[0]
     assert "sin historias asignadas" in d.markdown
-    # §6 RNF se lee de la §14 del alcance; los valores faltantes quedan marcados
-    assert "| RNF-01 |" in d.markdown and "[por definir]" in d.markdown
-    assert "SUG-RNF** (§15)" in d.markdown
+    # §6: 3 RNF medibles por SPEC con las cifras sin responder (guía §8) +
+    # las filas fijas del alcance §14 (seguridad, integridad, compatibilidad)
+    assert "| RNF-001-01 |" in d.markdown and "[por definir]" in d.markdown
+    assert "SUG-001-RNF-01" in d.markdown          # decisión abierta en §15
+    assert "| RNF-01 |" in d.markdown
 
 
 def test_reglas_y_fuera_de_alcance_vienen_del_documento():
@@ -174,16 +176,24 @@ def test_control_se_persiste_en_archivo(tmp_path):
 def test_preguntas_sugeridas_por_el_agente():
     control = _control_vacio()
     pend = preguntas_pendientes(control, spec_num=1)
-    ids = [q["id"] for q in pend]
-    assert {"SUG-RNF", "SUG-001-CASOS", "SUG-001-DEP"} <= set(ids)
+    ids = {q["id"] for q in pend}
+    assert {"SUG-001-RNF-01", "SUG-001-RNF-02", "SUG-001-RNF-03",
+            "SUG-001-CASOS", "SUG-001-DEP"} <= ids
+    # los RNF son campos numéricos con unidad (la interfaz usa number_input)
+    rnf = [q for q in pend if q["id"].startswith("SUG-001-RNF-")]
+    assert len(rnf) == 3 and all(q.get("campo") == "numero" for q in rnf)
+    assert {q.get("unidad") for q in rnf} == {"s", "%"}
+    # con la §14 del alcance sin filas [por definir], no hay SUG-RNF global
+    assert "SUG-RNF" not in ids
 
     docs = construir_specs(None, control=control)
     md = docs[0].markdown
-    assert "Preguntas sugeridas por el agente" in md and "SUG-RNF" in md
+    assert "Preguntas sugeridas por el agente" in md and "SUG-001-RNF-01" in md
     assert "SUG-001-CASOS" not in docs[4].markdown   # las sugerencias son por SPEC
 
     for q in pend:
-        assert registrar_respuesta(control, q["id"], f"ok: {q['id']}", "Profe")
+        valor = "2" if q.get("campo") == "numero" else f"ok: {q['id']}"
+        assert registrar_respuesta(control, q["id"], valor, "Profe")
     assert not [q for q in preguntas_pendientes(control, spec_num=1)
                 if str(q["id"]).startswith("SUG-")]
     assert not registrar_respuesta(control, "SUG-XXX", "id inexistente")
@@ -191,47 +201,45 @@ def test_preguntas_sugeridas_por_el_agente():
 
 def test_respuestas_de_sugerencias_alimentan_las_secciones():
     control = _control_vacio()
-    assert registrar_respuesta(control, "SUG-RNF", "Máximo 2 s, 99% disponibilidad", "Profe")
+    for suf, val in (("01", "2"), ("02", "99.5"), ("03", "30")):
+        assert registrar_respuesta(control, f"SUG-001-RNF-{suf}", val, "Profe")
     md = construir_specs(None, control=control)[0].markdown
     sec6 = md.split("## 6.")[1].split("## 7.")[0]
-    assert "| RNF-01 |" in sec6                       # la tabla viene del alcance §14
-    assert "Máximo 2 s" in sec6 and "Pendiente:" not in sec6
-    assert "SUG-RNF** — **Respondida** (Profe" in md
+    assert "| RNF-001-01 |" in sec6                # fila generada por SPEC
+    assert "tarda como máximo 2 segundos" in sec6 # la cifra entra al requisito
+    assert "al menos el 99.5%" in sec6
+    assert "cada 30 segundos" in sec6
+    assert "**2 s** (Profe" in sec6                # crédito de quién definió
+    assert "[por definir]" not in sec6             # las 3 respondidas + fijas "Definido"
+    assert "SUG-001-RNF-01** — **Respondida** (Profe" in md
 
 
-def test_rnf_con_valores_definidos_no_genera_pregunta(tmp_path):
-    """Si el equipo define todos los valores en §14, desaparece SUG-RNF y §6 queda limpia."""
-    original = ALCANCE_PATH.read_text(encoding="utf-8")
-    definido = original.replace("**[por definir]**", "2 s con 100 usuarios")
-    ruta = tmp_path / "alcance.md"
-    ruta.write_text(definido, encoding="utf-8")
-
-    secciones = _leer_alcance(ruta)
-    assert not [q for q in preguntas_generadas(1, secciones) if q["id"] == "SUG-RNF"]
+def test_rnf_por_spec_bloquean_aprobacion_hasta_poner_las_cifras():
     control = _control_vacio()
-    control["respuestas"] = {
-        "OPEN-Q-001": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
-        "OPEN-Q-002": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
-        "OPEN-Q-003": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
-        "SUG-001-CASOS": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
-        "SUG-001-DEP": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
-    }
-    docs = construir_specs(None, alcance_path=ruta, control=control)
-    sec6 = docs[0].markdown.split("## 6.")[1].split("## 7.")[0]
-    assert "| RNF-01 |" in sec6 and "[por definir]" not in sec6
-    # sin decisión abierta: no hay fila SUG-RNF pendiente en la §15
-    assert "**SUG-RNF** — **Pendiente**" not in docs[0].markdown
-    # SUG-RNF desaparece de las pendientes globales (CLI --responder sin SPEC)
+    # respondo todo menos los RNF numéricos: la aprobación sigue bloqueada
+    for q in preguntas_pendientes(control, spec_num=1):
+        if q.get("campo") == "numero":
+            continue
+        registrar_respuesta(control, q["id"], "x", "Profe")
+    pend_rnf = [q for q in preguntas_pendientes(control, spec_num=1)
+                if q.get("campo") == "numero"]
+    assert {q["id"] for q in pend_rnf} == {"SUG-001-RNF-01", "SUG-001-RNF-02", "SUG-001-RNF-03"}
+    ok, _ = aprobar(control, 1, "Profe")
+    assert not ok
+    for suf, val in (("01", "2"), ("02", "99.5"), ("03", "30")):
+        registrar_respuesta(control, f"SUG-001-RNF-{suf}", val, "Profe")
+    assert preguntas_pendientes(control, spec_num=1) == []
+    ok, _ = aprobar(control, 1, "Profe")
+    assert ok
+
+    # CLI --responder sin SPEC: los 36 RNF (12 SPECs × 3 cifras) + estáticas
     control2 = _control_vacio()
-    control2["respuestas"] = control["respuestas"] | {
-        f"SUG-{n:03d}-CASOS": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"}
-        for n in range(1, 13)
-    } | {
-        f"SUG-{n:03d}-DEP": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"}
-        for n in range(1, 13)
-    }
-    assert not [q for q in preguntas_pendientes(control2, ruta)
-                if q["id"] == "SUG-RNF"]
+    rnf = [q for q in preguntas_pendientes(control2) if q.get("campo") == "numero"]
+    assert len(rnf) == 36
+    assert {q["id"] for q in rnf if q["id"].startswith("SUG-007-")} == {
+        "SUG-007-RNF-01", "SUG-007-RNF-02", "SUG-007-RNF-03"}
+    # la §14 ya no tiene [por definir] → nunca se plantea la SUG-RNF global
+    assert not [q for q in preguntas_pendientes(control2) if q["id"] == "SUG-RNF"]
 
 
 # ── §2.8 gestión de cambios ────────────────────────────────────────────
@@ -280,9 +288,9 @@ def test_contexto_para_el_llm_sale_del_alcance():
     assert "REGLAS DE NEGOCIO" in ctx and "BR-01" in ctx
     assert "[PRIORIZACIÓN]" in ctx and "Imprescindible" in ctx
     assert "[ROLES]" in ctx and "Administrador" in ctx
-    # §14 RNF: los valores decididos entran; los [por definir] NO (no inventar)
-    assert "REQUISITOS NO FUNCIONALES" in ctx and "| RNF-04 |" in ctx
-    assert "| RNF-01 |" not in ctx and "[por definir]" not in ctx
+    # §14 RNF: solo las filas fijas decididas entran al contexto (§14 sin pendientes)
+    assert "REQUISITOS NO FUNCIONALES" in ctx and "| RNF-01 |" in ctx
+    assert "[por definir]" not in ctx
     # las decisiones pendientes (§10) NO se filtran al modelo: no debe inventar
     assert "OPEN-Q-" not in ctx
     assert "DECISIONES YA TOMADAS" not in ctx

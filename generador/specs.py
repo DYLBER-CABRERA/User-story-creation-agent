@@ -106,6 +106,53 @@ MAPEO_POR_ROL: dict[str, tuple[int, ...]] = {
     "administrador": (6, 6, 6, 11, 12),
 }
 
+# Operación principal de cada SPEC, para redactar sus RNF (guía §2.2/§8).
+RNF_OPERACION: dict[int, str] = {
+    1: "la consulta de rutas",
+    2: "la consulta de horarios",
+    3: "la actualización de posición y ETA",
+    4: "la planificación de viaje",
+    5: "la búsqueda y los filtros",
+    6: "las operaciones del módulo administrativo",
+    7: "el reporte de posición del conductor",
+    8: "la gestión de favoritas",
+    9: "el envío de notificaciones",
+    10: "la consulta sin cuenta",
+    11: "la publicación de avisos",
+    12: "la consulta de estadísticas",
+}
+
+# RNF medibles generados por SPEC: cada modelo produce una fila en la §6 y una
+# pregunta numérica SUG-{nnn}-RNF-{suf}; la cifra la pone el equipo en la
+# interfaz/CLI (guía §8: el agente NO inventa valores). `RNF_OPERACION` lleva
+# artículo; `_de()` lo flexiona para usarlo tras una preposición (evita "de el").
+RNF_MODELOS: tuple[dict, ...] = (
+    {
+        "suf": "01", "categoria": "Rendimiento", "unidad": "s", "unidad_txt": "segundos",
+        "ui": "Tiempo máximo de respuesta",
+        "req": "La respuesta {opde} tarda como máximo {valor} segundos bajo carga definida",
+    },
+    {
+        "suf": "02", "categoria": "Disponibilidad", "unidad": "%", "unidad_txt": "% de disponibilidad",
+        "ui": "Disponibilidad mínima (ventana mensual)",
+        "req": "El servicio que soporta {op} debe estar disponible al menos el {valor}% del tiempo (ventana mensual)",
+    },
+    {
+        "suf": "03", "categoria": "Actualización", "unidad": "s", "unidad_txt": "segundos",
+        "ui": "Cadencia máxima de actualización",
+        "req": "La información mostrada por {op} se actualiza como máximo cada {valor} segundos",
+    },
+)
+
+
+def _de(operacion: str) -> str:
+    """'la consulta de rutas' -> 'de la consulta de rutas'; 'el reporte' -> 'del reporte'."""
+    for articulo in ("el", "la", "los", "las"):
+        if operacion.startswith(articulo + " "):
+            resto = operacion[len(articulo) + 1:]
+            return ("del " if articulo == "el" else f"de {articulo} ") + resto
+    return f"de {operacion}"
+
 
 def spec_de_historia(rol: str, indice: int) -> int:
     """Número de SPEC (1-12) que recibe la historia `indice`-ésima del rol."""
@@ -247,7 +294,19 @@ def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
     """Preguntas que el agente propone al detectar información faltante o ambigua
     (guía §5, pasos 5-6). IDs estables para que las respuestas persistan."""
     func = next(f for f in CATALOGO if f.num == num)
-    generadas = [
+    generadas: list[dict] = [
+        {
+            # cifras medibles por SPEC: el campo numérico de la interfaz los captura
+            "id": f"SUG-{num:03d}-RNF-{m['suf']}",
+            "pregunta": f"{m['ui']} de {func.nombre} — en {m['unidad_txt']}",
+            "responsable": "Equipo",
+            "generada": True,
+            "campo": "numero",
+            "unidad": m["unidad"],
+        }
+        for m in RNF_MODELOS
+    ]
+    generadas += [
         {
             "id": f"SUG-{num:03d}-CASOS",
             "pregunta": (
@@ -314,7 +373,8 @@ def preguntas_pendientes(
     spec_num: int | None = None,
 ) -> list[dict]:
     """Sin responder: las estáticas del alcance +, si se indica `spec_num`, las
-    sugeridas por el agente para esa SPEC. Sin `spec_num`: estáticas + SUG-RNF."""
+    sugeridas por el agente para esa SPEC. Sin `spec_num`: estáticas + SUG-RNF
+    (respaldo) + los RNF numéricos de las 12 SPECs."""
     respuestas = control.get("respuestas") or {}
     secciones = _leer_alcance(alcance_path)
     pend = [q for q in _preguntas(_sec(secciones, 10)) if q["id"] not in respuestas]
@@ -323,6 +383,9 @@ def preguntas_pendientes(
     else:
         pend += [q for q in preguntas_generadas(1, secciones)
                  if q["id"] == "SUG-RNF" and q["id"] not in respuestas]
+        for f in CATALOGO:
+            pend += [q for q in preguntas_generadas(f.num, secciones)
+                     if q.get("campo") == "numero" and q["id"] not in respuestas]
     return pend
 
 
@@ -650,37 +713,49 @@ def _construir_markdown(
     )
     alcance_func = _bullet(_sec(secciones, 5), func.clave_alcance)
 
-    # §6 / §10 / §12: los RNF vienen de la §14 del alcance y la respuesta humana
-    # a las sugerencias alimenta la SPEC
+    # §6:3 RNF medibles por SPEC (guía §2.2/§8) que el equipo define en §15 +
+    # las filas fijas (seguridad/integridad/compatibilidad) de la §14 del alcance
     r_rnf = _respuesta(control, "SUG-RNF")
-    cuerpo_rnf = _rnf_seccion(secciones)
-    pend_rnf = _rnf_pendientes(secciones)
-    if cuerpo_rnf:
-        tabla_rnf = "\n".join(
-            ln for ln in cuerpo_rnf.splitlines() if not ln.lstrip().startswith(">")
-        ).strip()
-        md6 = (
-            "> Valores medibles definidos en `docs/alcance-contexto-proyecto.md` §14 "
-            "(guía §8: las cifras las define el equipo; el agente no inventa).\n\n"
-            + tabla_rnf
+    filas_rnf: list[str] = []
+    sin_valor: list[str] = []
+    for m in RNF_MODELOS:
+        rid = f"RNF-{n:03d}-{m['suf']}"
+        qid = f"SUG-{n:03d}-RNF-{m['suf']}"
+        r = _respuesta(control, qid)
+        valor = r["respuesta"] if r else "[por definir]"
+        if r:
+            celda = (f"**{valor} {m['unidad']}** "
+                     f"({r.get('responsable', '?')}, {r.get('fecha', '?')})")
+        else:
+            celda = "**[por definir]**"
+            sin_valor.append(qid)
+        requisito = m["req"].format(
+            op=RNF_OPERACION[n], opde=_de(RNF_OPERACION[n]), valor=valor
         )
-        if r_rnf:
-            md6 += (
-                f"\n\n**Valores definidos por el equipo ({r_rnf.get('responsable', '?')}, "
-                f"{r_rnf.get('fecha', '?')}):** {r_rnf.get('respuesta', '')}"
-            )
-        elif pend_rnf:
-            md6 += (
-                f"\n\nValores **[por definir]** → decisión abierta **SUG-RNF** (§15): "
-                f"{', '.join(pend_rnf)}."
-            )
-    else:
-        md6 = (
-            f"**Definidos por el equipo ({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
+        filas_rnf.append(f"| {rid} | {m['categoria']} | {requisito} | {celda} |")
+    filas_fijas = [
+        ln.strip() for ln in (_rnf_seccion(secciones) or "").splitlines()
+        if ln.strip().startswith("| RNF-")
+    ]
+    md6 = (
+        "> Valores medibles por funcionalidad, definidos por el equipo en §15 "
+        "(guía §8: el agente no inventa cifras). Las filas fijas de seguridad, "
+        "integridad y compatibilidad vienen de "
+        "`docs/alcance-contexto-proyecto.md` §14.\n\n"
+        "| ID | Categoría | Requisito verificable | Valor |\n"
+        "|----|-----------|----------------------|-------|\n"
+        + "\n".join(filas_rnf + filas_fijas)
+    )
+    if sin_valor:
+        md6 += (
+            f"\n\nValores **[por definir]** → decisiones abiertas en §15: "
+            f"{', '.join(sin_valor)}."
+        )
+    if r_rnf:  # respaldo: pregunta global SUG-RNF si el alcance la planteó
+        md6 += (
+            f"\n\n**Valores globales definidos por el equipo "
+            f"({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
             f"{r_rnf.get('respuesta', '')}"
-            if r_rnf else
-            "> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)\n"
-            "> aún no están definidos en el documento de alcance. Responsable: Equipo."
         )
     r_casos = _respuesta(control, f"SUG-{n:03d}-CASOS")
     md10_cierre = (

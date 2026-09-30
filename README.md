@@ -125,11 +125,14 @@ salen del alcance. Lo que no está definido queda marcado como **Pendiente**
 (nada se inventa, guía §11). Archivos: `docs/specs/SPEC-001-consulta-de-rutas.md`
 … `SPEC-012-estadisticas-basicas.md`.
 
-**RNF verificables (guía §8):** la **§6 de cada SPEC se lee de la §14 del
-alcance** (`## 14. Requisitos no funcionales`), donde el equipo define los valores
-medibles. Las filas marcadas **`[por definir]`** generan la pregunta `SUG-RNF`
-(bloquea la aprobación hasta responderla); los valores decididos sí entran al
-contexto del modelo de historias, los pendientes no (no se inventan cifras).
+**RNF verificables (guía §8):** cada SPEC genera en su **§6 tres RNF medibles**
+—tiempo de respuesta, disponibilidad y cadencia de actualización— propios de su
+funcionalidad; las cifras las pone el equipo en la app (campos numéricos con
+unidad) o en la CLI. Mientras falten quedan `[por definir]` y generan las
+preguntas `SUG-nnn-RNF-*`, que **bloquean la aprobación** de esa SPEC. Las
+filas **fijas** del proyecto (seguridad, integridad, compatibilidad) vienen de
+la §14 del alcance; los valores decididos sí entran al contexto del modelo,
+los pendientes no (no se inventan cifras).
 
 **Control humano (guía §12):** las preguntas abiertas (§15) deben responderse
 antes de aprobar, y el estado de cada SPEC sigue el ciclo
@@ -138,7 +141,7 @@ antes de aprobar, y el estado de cada SPEC sigue el ciclo
 
 ```bash
 python -m generador.specs --responder 001                 # responde en consola las preguntas (las de 001 incluyen sugerencias)
-python -m generador.specs --responder                     # solo las globales (OPEN-Q + RNF)
+python -m generador.specs --responder                     # solo las globales (OPEN-Q + los 36 RNF numéricos)
 python -m generador.specs --aprobar 001 --por "Prof. X"   # se niega si hay preguntas pendientes
 python -m generador.specs --congelar 001                  # solo desde APROBADA
 ```
@@ -146,8 +149,9 @@ python -m generador.specs --congelar 001                  # solo desde APROBADA
 Dos capacidades adicionales al estilo de la guía:
 
 - **§5 pasos 5-6 — preguntas sugeridas:** el agente genera preguntas (`SUG-*`)
-  cuando detecta información faltante (valores RNF `[por definir]` en la §14 del
-  alcance, casos límite sin analizar, dependencias pendientes, alcance ausente).
+  cuando detecta información faltante (las 3 cifras RNF de cada SPEC, casos
+  límite sin analizar, dependencias pendientes, alcance ausente; como respaldo,
+  una §14 con filas `[por definir]` o ausente).
   Se muestran en la §15 y su respuesta humana alimenta directamente las §6, §10
   y §12 de la SPEC.
 - **§2.8 gestión de cambios:** el contenido de cada SPEC aprobada/congelada se
@@ -156,8 +160,9 @@ Dos capacidades adicionales al estilo de la guía:
   cambiaron (análisis de impacto). La re-aprobación sigue siendo humana.
 
 En la app, la sección "Especificaciones (SPEC)" tiene el expander de preguntas
-(abiertas + sugeridas de la SPEC seleccionada), la advertencia si se detectan
-cambios en SPECs aprobadas, y los botones **Aprobar (v1.0)** / **Congelar (FROZEN)**;
+(abiertas + sugeridas de la SPEC seleccionada; las cifras RNF usan **campos
+numéricos**), la advertencia si se detectan cambios en SPECs aprobadas, y los
+botones **Aprobar (v1.0)** / **Congelar (FROZEN)**;
 aprobar queda deshabilitado mientras queden preguntas sin responder.
 
 ## Estructura
