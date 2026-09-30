@@ -106,12 +106,13 @@ Markdown de cada una y un botón para descargarlas todas en `.zip`.
 El campo "Contexto del proyecto" se **prellena desde `docs/alcance-contexto-proyecto.md`**
 (fuente única de verdad) — en consola y en la app — con: §1 problema, §2 solución,
 §3 objetivos, §4 público, §5 alcances, §6 fuera de alcance, §7 reglas de negocio,
-§8 priorización, §9 roles y las decisiones humanas ya respondidas de `control.json`
-(~4.3 KB, seguro para `OLLAMA_NUM_CTX=8192`).
-Se excluyen §10 preguntas abiertas (decisiones pendientes: pasarlas al modelo lo
-invitaría a inventar valores, guía §8) y §11-§13 (entregables, equipo/plazo,
-párrafo redundante). Sigue siendo editable a mano; `CONTEXT_DEFAULT` queda solo
-como respaldo si el documento no existe.
+§8 priorización, §9 roles, la §14 de RNF (solo filas con valor decidido) y las
+decisiones humanas ya respondidas de `control.json`
+(~5.3 KB, seguro para `OLLAMA_NUM_CTX=8192`).
+Se excluyen §10 preguntas abiertas, los RNF `[por definir]` y §11-§13 (decisiones
+pendientes: pasarlas al modelo lo invitaría a inventar valores, guía §8).
+Sigue siendo editable a mano; `CONTEXT_DEFAULT` queda solo como respaldo si el
+documento no existe.
 
 ### Especificaciones (SPEC)
 
@@ -123,6 +124,12 @@ contexto, reglas de negocio, fuera de alcance, restricciones y preguntas abierta
 salen del alcance. Lo que no está definido queda marcado como **Pendiente**
 (nada se inventa, guía §11). Archivos: `docs/specs/SPEC-001-consulta-de-rutas.md`
 … `SPEC-012-estadisticas-basicas.md`.
+
+**RNF verificables (guía §8):** la **§6 de cada SPEC se lee de la §14 del
+alcance** (`## 14. Requisitos no funcionales`), donde el equipo define los valores
+medibles. Las filas marcadas **`[por definir]`** generan la pregunta `SUG-RNF`
+(bloquea la aprobación hasta responderla); los valores decididos sí entran al
+contexto del modelo de historias, los pendientes no (no se inventan cifras).
 
 **Control humano (guía §12):** las preguntas abiertas (§15) deben responderse
 antes de aprobar, y el estado de cada SPEC sigue el ciclo
@@ -139,9 +146,10 @@ python -m generador.specs --congelar 001                  # solo desde APROBADA
 Dos capacidades adicionales al estilo de la guía:
 
 - **§5 pasos 5-6 — preguntas sugeridas:** el agente genera preguntas (`SUG-*`)
-  cuando detecta información faltante (RNF sin definir, casos límite sin analizar,
-  dependencias pendientes, alcance ausente). Se muestran en la §15 y su respuesta
-  humana alimenta directamente las §6, §10 y §12 de la SPEC.
+  cuando detecta información faltante (valores RNF `[por definir]` en la §14 del
+  alcance, casos límite sin analizar, dependencias pendientes, alcance ausente).
+  Se muestran en la §15 y su respuesta humana alimenta directamente las §6, §10
+  y §12 de la SPEC.
 - **§2.8 gestión de cambios:** el contenido de cada SPEC aprobada/congelada se
   "huella" por secciones; si algo cambia al regenerar, la SPEC vuelve a borrador
   con **versión incrementada (1.0 → 1.1)** y el §17 registra qué secciones

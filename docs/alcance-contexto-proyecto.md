@@ -141,3 +141,21 @@ puede consultar sin cuenta; guardar favoritas y recibir notificaciones requiere
 usuario registrado. Fuera de alcance: pagos, tarjetas de recarga y transporte fuera
 de Manizales. Roles: pasajero, conductor, administrador.
 ```
+
+---
+
+## 14. Requisitos no funcionales
+
+> Los valores medibles los define el equipo (guía §8: el Specification Agent no
+> inventa cifras). Las filas marcadas **[por definir]** son decisiones pendientes:
+> se envían al agente como la pregunta `SUG-RNF` y no deben aparecer en las
+> historias hasta que se respondan.
+
+| ID | Categoría | Requisito verificable | Valor |
+|----|-----------|----------------------|-------|
+| RNF-01 | Rendimiento | Las consultas principales (rutas, horarios, búsqueda) responden en un máximo de X segundos con N usuarios concurrentes | **[por definir]** |
+| RNF-02 | Rendimiento | La posición GPS y el ETA se actualizan como máximo cada X segundos durante el recorrido | **[por definir]** |
+| RNF-03 | Disponibilidad | El servicio está disponible al menos el X% del tiempo (ventana mensual) | **[por definir]** |
+| RNF-04 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
+| RNF-05 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
+| RNF-06 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |

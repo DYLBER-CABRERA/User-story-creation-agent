@@ -43,8 +43,18 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 > **Pendiente:** sin historias asignadas en la corrida actual. Genere historias (app o CLI) y vuelva a exportar.
 
 ## 6. Requisitos no funcionales
-> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)
-> aún no están definidos en el documento de alcance. Responsable: Equipo.
+> Valores medibles definidos en `docs/alcance-contexto-proyecto.md` §14 (guía §8: las cifras las define el equipo; el agente no inventa).
+
+| ID | Categoría | Requisito verificable | Valor |
+|----|-----------|----------------------|-------|
+| RNF-01 | Rendimiento | Las consultas principales (rutas, horarios, búsqueda) responden en un máximo de X segundos con N usuarios concurrentes | **[por definir]** |
+| RNF-02 | Rendimiento | La posición GPS y el ETA se actualizan como máximo cada X segundos durante el recorrido | **[por definir]** |
+| RNF-03 | Disponibilidad | El servicio está disponible al menos el X% del tiempo (ventana mensual) | **[por definir]** |
+| RNF-04 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
+| RNF-05 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
+| RNF-06 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
+
+Valores **[por definir]** → decisión abierta **SUG-RNF** (§15): RNF-01, RNF-02, RNF-03.
 
 ## 7. Reglas de negocio
 - **BR-01:** Cualquier persona puede consultar rutas, horarios y mapa sin crear una cuenta.
@@ -86,13 +96,13 @@ Sophia Cardona. Plazo: 8 semanas desde cero.
 
 **Estado de cada pregunta (control humano):**
 
-- **OPEN-Q-001** — **Pendiente**: ¿Los datos de las rutas los suministra la empresa de transporte o se cargan manualmente?
-- **OPEN-Q-002** — **Pendiente**: ¿Las notificaciones salen fuera de la app o son avisos dentro de la misma?
-- **OPEN-Q-003** — **Pendiente**: ¿Qué ocurre con el ETA cuando una buseta no reporta su posición?
+- **OPEN-Q-001** — **Respondida** (Web, 2026-09-29): los subministra la empresa
+- **OPEN-Q-002** — **Respondida** (Web, 2026-09-29): avisos dentro de la misma
+- **OPEN-Q-003** — **Respondida** (Web, 2026-09-29): le reporta al usuario que perdio la ubicacion y le dice este pendiente de la siguiente buseta con la misma ruta
 
 **Preguntas sugeridas por el agente (§5 pasos 5-6):**
 
-- **SUG-RNF** — **Pendiente** (sugerida por el agente): El apartado de requisitos no funcionales (§6) sigue vacío. ¿Qué condiciones de calidad y valores verificables aplican al proyecto (p. ej. máximo X segundos de respuesta, Y % disponibilidad)?
+- **SUG-RNF** — **Pendiente** (sugerida por el agente): Valores medibles de RNF sin definir en §14 del alcance (guía §8: el agente NO debe inventar cifras): RNF-01, RNF-02, RNF-03. ¿Cuál es el valor de cada uno (segundos, % de disponibilidad, etc.)?
 - **SUG-003-CASOS** — **Pendiente** (sugerida por el agente): Casos límite sin analizar (§10) para Seguimiento en tiempo real (GPS/ETA). ¿Qué casos deben especificarse (concurrencia, valores extremos, datos faltantes)?
 - **SUG-003-DEP** — **Pendiente** (sugerida por el agente): Dependencias pendientes (§12) para Seguimiento en tiempo real (GPS/ETA). ¿Hay dependencias externas (datos, APIs, permisos)? Responder 'ninguna' si no aplica.
 

@@ -1,0 +1,21 @@
+{
+  "respuestas": {
+    "OPEN-Q-001": {
+      "respuesta": "los subministra la empresa",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    },
+    "OPEN-Q-002": {
+      "respuesta": "avisos dentro de la misma",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    },
+    "OPEN-Q-003": {
+      "respuesta": "le reporta al usuario que perdio la ubicacion y le dice este pendiente de la siguiente buseta con la misma ruta",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    }
+  },
+  "estados": {},
+  "eventos": []
+}

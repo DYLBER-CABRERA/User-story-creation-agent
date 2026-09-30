@@ -4,7 +4,7 @@ Ensambla el documento de las 17 secciones de la guía del Specification Agent
 (docs/Guia - Specification Agent.md, sección 7) a partir de:
 
 - docs/alcance-contexto-proyecto.md -> contexto, alcance, reglas, restricciones,
-  fuera de alcance y preguntas abiertas (fuente única de verdad).
+  fuera de alcance, preguntas abiertas y RNF medibles (§14) (fuente única de verdad).
 - las historias ya generadas        -> RF (§5), flujos (§8-9), criterios (§11)
   y trazabilidad (§16).
 
@@ -227,21 +227,27 @@ def _todas_las_preguntas(alcance_path: Path = ALCANCE_PATH) -> list[dict]:
     return _preguntas(_sec(_leer_alcance(alcance_path), 10))
 
 
+def _rnf_seccion(secciones: dict[str, str]) -> str:
+    """Cuerpo de la §14 del alcance (RNF), o '' si el documento no la tiene."""
+    cuerpo = _sec(secciones, 14)
+    return "" if cuerpo.startswith("_Ver") else cuerpo
+
+
+def _rnf_pendientes(secciones: dict[str, str]) -> list[str]:
+    """IDs de RNF de la §14 del alcance cuyo valor sigue '[por definir]'."""
+    pendientes = []
+    for linea in (_rnf_seccion(secciones) or "").splitlines():
+        linea = linea.strip()
+        if linea.startswith("| RNF-") and "[por definir]" in linea:
+            pendientes.append(linea.strip("|").split("|")[0].strip())
+    return pendientes
+
+
 def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
     """Preguntas que el agente propone al detectar información faltante o ambigua
     (guía §5, pasos 5-6). IDs estables para que las respuestas persistan."""
     func = next(f for f in CATALOGO if f.num == num)
     generadas = [
-        {
-            "id": "SUG-RNF",
-            "pregunta": (
-                "El apartado de requisitos no funcionales (§6) sigue vacío. "
-                "¿Qué condiciones de calidad y valores verificables aplican al proyecto "
-                "(p. ej. máximo X segundos de respuesta, Y % disponibilidad)?"
-            ),
-            "responsable": "Equipo",
-            "generada": True,
-        },
         {
             "id": f"SUG-{num:03d}-CASOS",
             "pregunta": (
@@ -261,6 +267,30 @@ def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
             "generada": True,
         },
     ]
+    pend_rnf = _rnf_pendientes(secciones)
+    if pend_rnf:
+        generadas.insert(0, {
+            "id": "SUG-RNF",
+            "pregunta": (
+                "Valores medibles de RNF sin definir en §14 del alcance "
+                "(guía §8: el agente NO debe inventar cifras): "
+                f"{', '.join(pend_rnf)}. "
+                "¿Cuál es el valor de cada uno (segundos, % de disponibilidad, etc.)?"
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        })
+    elif not _rnf_seccion(secciones):
+        generadas.insert(0, {
+            "id": "SUG-RNF",
+            "pregunta": (
+                "El documento de alcance no tiene la §14 de requisitos no funcionales. "
+                "¿Qué condiciones de calidad y valores verificables aplican al proyecto "
+                "(p. ej. máximo X segundos de respuesta, Y % disponibilidad)?"
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        })
     if _bullet(_sec(secciones, 5), func.clave_alcance) is None:
         generadas.append({
             "id": f"SUG-{num:03d}-ALC",
@@ -322,17 +352,26 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
     documento de alcance (fuente única de verdad) en lugar de texto hardcodeado.
 
     Incluye §1 problema, §2 solución, §3 objetivos, §4 público, §5 alcances,
-    §6 fuera de alcance, §7 reglas de negocio, §8 priorización y §9 roles, más
-    las decisiones humanas ya resueltas (control.json). Excluye §10 preguntas
-    abiertas y §11-§13 (entregables, equipo/plazo, párrafo de contexto): las
-    decisiones pendientes no se le pasan al modelo (guía §8: no debe inventar
-    valores) y el planning no aporta a las historias. ~4.3 KB, seguro para la
-    ventana de 8192 tokens de qwen2.5:3b."""
+    §6 fuera de alcance, §7 reglas de negocio, §8 priorización, §9 roles y la §14
+    de RNF (solo las filas cuyo valor ya está decidido), más las decisiones
+    humanas ya resueltas (control.json). Excluye §10 preguntas abiertas y §11-§13
+    (entregables, equipo/plazo, párrafo de contexto): las decisiones pendientes
+    no se le pasan al modelo (guía §8: no debe inventar valores). ~4.7 KB, seguro
+    para la ventana de 8192 tokens de qwen2.5:3b."""
     secciones = _leer_alcance(alcance_path)
     if not secciones:
         return ""
     if control is None:
         control = cargar_control()
+    cuerpo_rnf = ""
+    if _rnf_seccion(secciones):
+        lineas = [
+            ln for ln in _rnf_seccion(secciones).splitlines()
+            if "[por definir]" not in ln and not ln.lstrip().startswith(">")
+        ]
+        cuerpo_rnf = "\n".join(lineas).strip()
+        if "| RNF-" not in cuerpo_rnf:
+            cuerpo_rnf = ""          # ningún valor decidido todavía: no se filtra
     bloques = [
         ("PROBLEMA", _sec(secciones, 1)),
         ("SOLUCIÓN", _sec(secciones, 2)),
@@ -343,6 +382,8 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
         ("REGLAS DE NEGOCIO — RESPÉTALAS EN FLUJOS Y CRITERIOS", _sec(secciones, 7)),
         ("PRIORIZACIÓN", _sec(secciones, 8)),
         ("ROLES", _sec(secciones, 9)),
+        ("REQUISITOS NO FUNCIONALES — SOLO VALORES YA DECIDIDOS, NO INVENTES LOS QUE FALTEN",
+         cuerpo_rnf),
     ]
     partes = [
         f"[{titulo}]\n{cuerpo.strip()}"
@@ -609,15 +650,38 @@ def _construir_markdown(
     )
     alcance_func = _bullet(_sec(secciones, 5), func.clave_alcance)
 
-    # §6 / §10 / §12: la respuesta humana a las sugerencias alimenta la SPEC
+    # §6 / §10 / §12: los RNF vienen de la §14 del alcance y la respuesta humana
+    # a las sugerencias alimenta la SPEC
     r_rnf = _respuesta(control, "SUG-RNF")
-    md6 = (
-        f"**Definidos por el equipo ({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
-        f"{r_rnf.get('respuesta', '')}"
-        if r_rnf else
-        "> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)\n"
-        "> aún no están definidos en el documento de alcance. Responsable: Equipo."
-    )
+    cuerpo_rnf = _rnf_seccion(secciones)
+    pend_rnf = _rnf_pendientes(secciones)
+    if cuerpo_rnf:
+        tabla_rnf = "\n".join(
+            ln for ln in cuerpo_rnf.splitlines() if not ln.lstrip().startswith(">")
+        ).strip()
+        md6 = (
+            "> Valores medibles definidos en `docs/alcance-contexto-proyecto.md` §14 "
+            "(guía §8: las cifras las define el equipo; el agente no inventa).\n\n"
+            + tabla_rnf
+        )
+        if r_rnf:
+            md6 += (
+                f"\n\n**Valores definidos por el equipo ({r_rnf.get('responsable', '?')}, "
+                f"{r_rnf.get('fecha', '?')}):** {r_rnf.get('respuesta', '')}"
+            )
+        elif pend_rnf:
+            md6 += (
+                f"\n\nValores **[por definir]** → decisión abierta **SUG-RNF** (§15): "
+                f"{', '.join(pend_rnf)}."
+            )
+    else:
+        md6 = (
+            f"**Definidos por el equipo ({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
+            f"{r_rnf.get('respuesta', '')}"
+            if r_rnf else
+            "> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)\n"
+            "> aún no están definidos en el documento de alcance. Responsable: Equipo."
+        )
     r_casos = _respuesta(control, f"SUG-{n:03d}-CASOS")
     md10_cierre = (
         f"**Casos límite definidos por el equipo ({r_casos.get('responsable', '?')}, "

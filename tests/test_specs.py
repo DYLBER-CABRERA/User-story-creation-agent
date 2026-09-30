@@ -1,5 +1,7 @@
 from generador.specs import (
+    ALCANCE_PATH,
     CATALOGO,
+    _leer_alcance,
     aprobar,
     cargar_control,
     construir_specs,
@@ -8,6 +10,7 @@ from generador.specs import (
     detectar_cambios,
     escribir_specs,
     guardar_control,
+    preguntas_generadas,
     preguntas_pendientes,
     registrar_respuesta,
     seleccionar,
@@ -61,7 +64,9 @@ def test_spec_sin_historias_marca_pendientes():
     docs = construir_specs(None, control=VACIO)
     d = docs[0]
     assert "sin historias asignadas" in d.markdown
-    assert "> **Pendiente:** los requisitos no funcionales" in d.markdown
+    # §6 RNF se lee de la §14 del alcance; los valores faltantes quedan marcados
+    assert "| RNF-01 |" in d.markdown and "[por definir]" in d.markdown
+    assert "SUG-RNF** (§15)" in d.markdown
 
 
 def test_reglas_y_fuera_de_alcance_vienen_del_documento():
@@ -189,8 +194,44 @@ def test_respuestas_de_sugerencias_alimentan_las_secciones():
     assert registrar_respuesta(control, "SUG-RNF", "Máximo 2 s, 99% disponibilidad", "Profe")
     md = construir_specs(None, control=control)[0].markdown
     sec6 = md.split("## 6.")[1].split("## 7.")[0]
+    assert "| RNF-01 |" in sec6                       # la tabla viene del alcance §14
     assert "Máximo 2 s" in sec6 and "Pendiente:" not in sec6
     assert "SUG-RNF** — **Respondida** (Profe" in md
+
+
+def test_rnf_con_valores_definidos_no_genera_pregunta(tmp_path):
+    """Si el equipo define todos los valores en §14, desaparece SUG-RNF y §6 queda limpia."""
+    original = ALCANCE_PATH.read_text(encoding="utf-8")
+    definido = original.replace("**[por definir]**", "2 s con 100 usuarios")
+    ruta = tmp_path / "alcance.md"
+    ruta.write_text(definido, encoding="utf-8")
+
+    secciones = _leer_alcance(ruta)
+    assert not [q for q in preguntas_generadas(1, secciones) if q["id"] == "SUG-RNF"]
+    control = _control_vacio()
+    control["respuestas"] = {
+        "OPEN-Q-001": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
+        "OPEN-Q-002": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
+        "OPEN-Q-003": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
+        "SUG-001-CASOS": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
+        "SUG-001-DEP": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"},
+    }
+    docs = construir_specs(None, alcance_path=ruta, control=control)
+    sec6 = docs[0].markdown.split("## 6.")[1].split("## 7.")[0]
+    assert "| RNF-01 |" in sec6 and "[por definir]" not in sec6
+    # sin decisión abierta: no hay fila SUG-RNF pendiente en la §15
+    assert "**SUG-RNF** — **Pendiente**" not in docs[0].markdown
+    # SUG-RNF desaparece de las pendientes globales (CLI --responder sin SPEC)
+    control2 = _control_vacio()
+    control2["respuestas"] = control["respuestas"] | {
+        f"SUG-{n:03d}-CASOS": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"}
+        for n in range(1, 13)
+    } | {
+        f"SUG-{n:03d}-DEP": {"respuesta": "x", "responsable": "P", "fecha": "2026-01-01"}
+        for n in range(1, 13)
+    }
+    assert not [q for q in preguntas_pendientes(control2, ruta)
+                if q["id"] == "SUG-RNF"]
 
 
 # ── §2.8 gestión de cambios ────────────────────────────────────────────
@@ -239,6 +280,9 @@ def test_contexto_para_el_llm_sale_del_alcance():
     assert "REGLAS DE NEGOCIO" in ctx and "BR-01" in ctx
     assert "[PRIORIZACIÓN]" in ctx and "Imprescindible" in ctx
     assert "[ROLES]" in ctx and "Administrador" in ctx
+    # §14 RNF: los valores decididos entran; los [por definir] NO (no inventar)
+    assert "REQUISITOS NO FUNCIONALES" in ctx and "| RNF-04 |" in ctx
+    assert "| RNF-01 |" not in ctx and "[por definir]" not in ctx
     # las decisiones pendientes (§10) NO se filtran al modelo: no debe inventar
     assert "OPEN-Q-" not in ctx
     assert "DECISIONES YA TOMADAS" not in ctx
