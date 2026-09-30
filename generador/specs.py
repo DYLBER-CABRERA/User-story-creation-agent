@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -226,9 +227,73 @@ def _todas_las_preguntas(alcance_path: Path = ALCANCE_PATH) -> list[dict]:
     return _preguntas(_sec(_leer_alcance(alcance_path), 10))
 
 
-def preguntas_pendientes(control: dict, alcance_path: Path = ALCANCE_PATH) -> list[dict]:
+def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
+    """Preguntas que el agente propone al detectar información faltante o ambigua
+    (guía §5, pasos 5-6). IDs estables para que las respuestas persistan."""
+    func = next(f for f in CATALOGO if f.num == num)
+    generadas = [
+        {
+            "id": "SUG-RNF",
+            "pregunta": (
+                "El apartado de requisitos no funcionales (§6) sigue vacío. "
+                "¿Qué condiciones de calidad y valores verificables aplican al proyecto "
+                "(p. ej. máximo X segundos de respuesta, Y % disponibilidad)?"
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        },
+        {
+            "id": f"SUG-{num:03d}-CASOS",
+            "pregunta": (
+                f"Casos límite sin analizar (§10) para {func.nombre}. "
+                "¿Qué casos deben especificarse (concurrencia, valores extremos, datos faltantes)?"
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        },
+        {
+            "id": f"SUG-{num:03d}-DEP",
+            "pregunta": (
+                f"Dependencias pendientes (§12) para {func.nombre}. "
+                "¿Hay dependencias externas (datos, APIs, permisos)? Responder 'ninguna' si no aplica."
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        },
+    ]
+    if _bullet(_sec(secciones, 5), func.clave_alcance) is None:
+        generadas.append({
+            "id": f"SUG-{num:03d}-ALC",
+            "pregunta": (
+                f"No se encontró el alcance de '{func.clave_alcance}' en §5 del documento. "
+                "¿Cuál es su alcance exacto?"
+            ),
+            "responsable": "Equipo",
+            "generada": True,
+        })
+    return generadas
+
+
+def _respuesta(control: dict, pregunta_id: str) -> dict | None:
+    return (control.get("respuestas") or {}).get(pregunta_id)
+
+
+def preguntas_pendientes(
+    control: dict,
+    alcance_path: Path = ALCANCE_PATH,
+    spec_num: int | None = None,
+) -> list[dict]:
+    """Sin responder: las estáticas del alcance +, si se indica `spec_num`, las
+    sugeridas por el agente para esa SPEC. Sin `spec_num`: estáticas + SUG-RNF."""
     respuestas = control.get("respuestas") or {}
-    return [q for q in _todas_las_preguntas(alcance_path) if q["id"] not in respuestas]
+    secciones = _leer_alcance(alcance_path)
+    pend = [q for q in _preguntas(_sec(secciones, 10)) if q["id"] not in respuestas]
+    if spec_num is not None:
+        pend += [q for q in preguntas_generadas(spec_num, secciones) if q["id"] not in respuestas]
+    else:
+        pend += [q for q in preguntas_generadas(1, secciones)
+                 if q["id"] == "SUG-RNF" and q["id"] not in respuestas]
+    return pend
 
 
 def registrar_respuesta(
@@ -238,7 +303,11 @@ def registrar_respuesta(
     responsable: str = "Equipo",
     alcance_path: Path = ALCANCE_PATH,
 ) -> bool:
-    if pregunta_id not in {q["id"] for q in _todas_las_preguntas(alcance_path)}:
+    secciones = _leer_alcance(alcance_path)
+    validos = {q["id"] for q in _preguntas(_sec(secciones, 10))}
+    for f in CATALOGO:
+        validos.update(q["id"] for q in preguntas_generadas(f.num, secciones))
+    if pregunta_id not in validos:
         return False
     control.setdefault("respuestas", {})[pregunta_id] = {
         "respuesta": respuesta,
@@ -248,13 +317,79 @@ def registrar_respuesta(
     return True
 
 
+def _info_secciones(markdown: str) -> dict[str, tuple[str, str]]:
+    """{num_sección: (título, sha256(título+cuerpo))} para §1..§16 (cabecera y §17 excluidas)."""
+    info: dict[str, tuple[str, str]] = {}
+    patron = re.compile(r"(?m)^## (\d+)\. ([^\n]+)\n(.*?)(?=^## \d+\. |\Z)", re.S)
+    for m in patron.finditer(markdown):
+        num, titulo, cuerpo = m.group(1), m.group(2).strip(), m.group(3)
+        if num == "17":
+            continue
+        digesto = hashlib.sha256(f"{titulo}\n{cuerpo}".encode("utf-8")).hexdigest()
+        info[num] = (titulo, digesto)
+    return info
+
+
+def _bump(version: str) -> str:
+    partes = str(version).split(".")
+    if len(partes) == 2 and partes[1].isdigit():
+        return f"{partes[0]}.{int(partes[1]) + 1}"
+    return version
+
+
+def detectar_cambios(control: dict, docs: list[SpecDoc]) -> list[str]:
+    """§2.8 (gestión de cambios): si el contenido de una SPEC aprobada/congelada ya no
+    coincide con el aprobado, sube la versión, la devuelve a borrador (re-aprobación
+    humana) y registra el impacto en el historial. Devuelve mensajes de log."""
+    mensajes: list[str] = []
+    for d in docs:
+        est = (control.get("estados") or {}).get(f"{d.num:03d}")
+        if not est or est.get("estado") not in ("aprobada", "congelada"):
+            continue
+        actuales = _info_secciones(d.markdown)
+        hashes_actuales = {k: v[1] for k, v in actuales.items()}
+        guardadas = est.get("hashes")
+        if not guardadas:
+            est["hashes"] = hashes_actuales            # respaldo de aprobaciones antiguas
+            continue
+        distintas = sorted(
+            (k for k in set(guardadas) | set(hashes_actuales)
+             if guardadas.get(k) != hashes_actuales.get(k)),
+            key=int,
+        )
+        if not distintas:
+            continue
+        impacto = ", ".join(
+            f"§{k} {actuales[k][0]}" if k in actuales else f"§{k} (sección eliminada)"
+            for k in distintas
+        )
+        nueva = _bump(est.get("version", "1.0"))
+        est.update(
+            estado="borrador",
+            version=nueva,
+            hashes=hashes_actuales,
+        )
+        control.setdefault("eventos", []).append({
+            "spec": f"{d.num:03d}",
+            "evento": "Cambio detectado",
+            "fecha": datetime.date.today().isoformat(),
+            "version": nueva,
+            "impacto": impacto,
+        })
+        mensajes.append(
+            f"SPEC-{d.num:03d}: cambio detectado ({impacto}) → v{nueva} pendiente de re-aprobación."
+        )
+    return mensajes
+
+
 def aprobar(
     control: dict,
     num: int,
     por: str,
     alcance_path: Path = ALCANCE_PATH,
+    markdown: str | None = None,
 ) -> tuple[bool, str]:
-    pend = preguntas_pendientes(control, alcance_path)
+    pend = preguntas_pendientes(control, alcance_path, spec_num=num)
     if pend:
         ids = ", ".join(q["id"] for q in pend)
         return False, f"No se puede aprobar: faltan respuestas a {ids} (guía §12: detener el cierre)."
@@ -263,11 +398,19 @@ def aprobar(
     if est and est.get("estado") in ("aprobada", "congelada"):
         return False, f"SPEC-{clave} ya está {est.get('estado')}."
     hoy = datetime.date.today().isoformat()
-    control["estados"][clave] = {"estado": "aprobada", "version": "1.0", "por": por, "fecha": hoy}
+    version = "1.0"
+    if est and est.get("version") and est["version"] != "0.1":
+        version = est["version"]          # re-aprobación tras un cambio: conserva v1.x
+    nuevo = {"estado": "aprobada", "version": version, "por": por, "fecha": hoy}
+    if markdown is not None:
+        nuevo["hashes"] = {k: v[1] for k, v in _info_secciones(markdown).items()}
+    elif est and est.get("hashes"):
+        nuevo["hashes"] = est["hashes"]
+    control["estados"][clave] = nuevo
     control.setdefault("eventos", []).append(
-        {"spec": clave, "evento": "Aprobada", "por": por, "fecha": hoy, "version": "1.0"}
+        {"spec": clave, "evento": "Aprobada", "por": por, "fecha": hoy, "version": version}
     )
-    return True, f"SPEC-{clave} APROBADA v1.0 por {por}."
+    return True, f"SPEC-{clave} APROBADA v{version} por {por}."
 
 
 def congelar(control: dict, num: int) -> tuple[bool, str]:
@@ -283,14 +426,18 @@ def congelar(control: dict, num: int) -> tuple[bool, str]:
     return True, f"SPEC-{clave} FROZEN v{est.get('version', '1.0')}."
 
 
-def interactivo_responder(control: dict, alcance_path: Path = ALCANCE_PATH) -> dict:
-    pendientes = [q for q in _todas_las_preguntas(alcance_path)
-                  if q["id"] not in (control.get("respuestas") or {})]
+def interactivo_responder(
+    control: dict,
+    alcance_path: Path = ALCANCE_PATH,
+    spec_num: int | None = None,
+) -> dict:
+    pendientes = preguntas_pendientes(control, alcance_path, spec_num)
     if not pendientes:
         print("No hay preguntas pendientes.", flush=True)
         return control
     for q in pendientes:
-        print(f"\n{q['id']} (responsable sugerido: {q['responsable']})", flush=True)
+        etq = "sugerida por el agente" if q.get("generada") else f"responsable sugerido: {q['responsable']}"
+        print(f"\n{q['id']} ({etq})", flush=True)
         print(f"  {q['pregunta']}", flush=True)
         resp = input("  Respuesta (Enter = omitir): ").strip()
         if resp:
@@ -299,22 +446,26 @@ def interactivo_responder(control: dict, alcance_path: Path = ALCANCE_PATH) -> d
     return control
 
 
-def _md_preguntas(secciones: dict[str, str], control: dict) -> str:
+def _md_preguntas(secciones: dict[str, str], control: dict, num: int) -> str:
     cuerpo = _sec(secciones, 10)
-    preguntas = _preguntas(cuerpo)
-    if not preguntas:
-        return cuerpo
     respuestas = control.get("respuestas") or {}
-    lineas = [cuerpo, "", "**Estado de cada pregunta (control humano):**", ""]
-    for q in preguntas:
+
+    def _fila(q: dict) -> str:
         r = respuestas.get(q["id"])
         if r:
-            lineas.append(
+            return (
                 f"- **{q['id']}** — **Respondida** "
                 f"({r.get('responsable', '?')}, {r.get('fecha', '?')}): {r.get('respuesta', '')}"
             )
-        else:
-            lineas.append(f"- **{q['id']}** — **Pendiente**: {q['pregunta']}")
+        etiqueta = " (sugerida por el agente)" if q.get("generada") else ""
+        return f"- **{q['id']}** — **Pendiente**{etiqueta}: {q['pregunta']}"
+
+    lineas = [cuerpo, "", "**Estado de cada pregunta (control humano):**", ""]
+    lineas.extend(_fila(q) for q in _preguntas(cuerpo))
+    generadas = preguntas_generadas(num, secciones)
+    if generadas:
+        lineas += ["", "**Preguntas sugeridas por el agente (§5 pasos 5-6):**", ""]
+        lineas.extend(_fila(q) for q in generadas)
     return "\n".join(lineas)
 
 
@@ -346,8 +497,15 @@ def _construir_markdown(
         version = est.get("version", "1.0")
         estado_txt = f"FROZEN (congelada) v{version} — cambios requieren nueva versión"
     else:
-        estado, version = "borrador", "0.1"
-        estado_txt = "Borrador v0.1 — pendiente de aprobación humana"
+        estado = "borrador"
+        version = est.get("version", "0.1")
+        if version != "0.1":
+            estado_txt = (
+                f"Borrador v{version} — pendiente de re-aprobación "
+                f"(última aprobación: {est.get('por', '?')}, {est.get('fecha', '?')})"
+            )
+        else:
+            estado_txt = "Borrador v0.1 — pendiente de aprobación humana"
 
     cabecera = (
         f"# SPEC-{n:03d} — {func.nombre}\n\n"
@@ -405,8 +563,35 @@ def _construir_markdown(
     )
     alcance_func = _bullet(_sec(secciones, 5), func.clave_alcance)
 
-    md15 = _md_preguntas(secciones, control)
-    aprob_col = {"borrador": "Pendiente (humana)", "aprobada": "APROBADA", "congelada": "FROZEN"}[estado]
+    # §6 / §10 / §12: la respuesta humana a las sugerencias alimenta la SPEC
+    r_rnf = _respuesta(control, "SUG-RNF")
+    md6 = (
+        f"**Definidos por el equipo ({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
+        f"{r_rnf.get('respuesta', '')}"
+        if r_rnf else
+        "> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)\n"
+        "> aún no están definidos en el documento de alcance. Responsable: Equipo."
+    )
+    r_casos = _respuesta(control, f"SUG-{n:03d}-CASOS")
+    md10_cierre = (
+        f"**Casos límite definidos por el equipo ({r_casos.get('responsable', '?')}, "
+        f"{r_casos.get('fecha', '?')}):** {r_casos.get('respuesta', '')}"
+        if r_casos else
+        "- Casos límite adicionales (concurrencia, valores extremos): **pendiente de análisis** (guía §2.6)."
+    )
+    r_dep = _respuesta(control, f"SUG-{n:03d}-DEP")
+    md12 = (
+        f"**Dependencias (respuesta de {r_dep.get('responsable', '?')}, {r_dep.get('fecha', '?')}):** "
+        f"{r_dep.get('respuesta', '')}"
+        if r_dep else
+        "> **Pendiente:** corresponde a la etapa de arquitectura, no definida en este documento."
+    )
+
+    md15 = _md_preguntas(secciones, control, n)
+    if estado == "borrador":
+        aprob_col = "Pendiente (re-aprobación)" if version != "0.1" else "Pendiente (humana)"
+    else:
+        aprob_col = {"aprobada": "APROBADA", "congelada": "FROZEN"}[estado]
     filas_hist = [
         f"| {version} | {fecha} | Generación automática desde alcance + historias | {aprob_col} |"
     ]
@@ -415,7 +600,13 @@ def _construir_markdown(
             detalle = ev.get("evento", "")
             if ev.get("por"):
                 detalle += f" por {ev['por']}"
-            aprob_ev = {"Aprobada": "APROBADA", "Congelada": "FROZEN"}.get(ev.get("evento", ""), "")
+            if ev.get("impacto"):
+                detalle += f" — impacto: {ev['impacto']}"
+            aprob_ev = {
+                "Aprobada": "APROBADA",
+                "Congelada": "FROZEN",
+                "Cambio detectado": "Pendiente (re-aprobación)",
+            }.get(ev.get("evento", ""), "")
             filas_hist.append(
                 f"| {ev.get('version', version)} | {ev.get('fecha', '')} | {detalle} | {aprob_ev} |"
             )
@@ -442,8 +633,7 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 {chr(10).join(rf_lineas)}
 
 ## 6. Requisitos no funcionales
-> **Pendiente:** los requisitos no funcionales (rendimiento, disponibilidad, seguridad...)
-> aún no están definidos en el documento de alcance. Responsable: Equipo.
+{md6}
 
 ## 7. Reglas de negocio
 {br_md}
@@ -456,13 +646,13 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 
 ## 10. Casos límite
 {chr(10).join(limite)}
-- Casos límite adicionales (concurrencia, valores extremos): **pendiente de análisis** (guía §2.6).
+{md10_cierre}
 
 ## 11. Criterios de aceptación
 {chr(10).join(ac_lineas)}
 
 ## 12. Dependencias
-> **Pendiente:** corresponde a la etapa de arquitectura, no definida en este documento.
+{md12}
 
 ## 13. Restricciones
 {_sec(secciones, 12)}
@@ -550,8 +740,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--spec", default="all", help="Todas (default) o un número/slug (ej. 003, rutas)")
     ap.add_argument("--out", default=str(SPECS_DIR), help="Carpeta de salida (default: docs/specs)")
     ap.add_argument("--control", default=None, help=f"Archivo de control humano (default: {CONTROL_PATH})")
-    ap.add_argument("--responder", action="store_true",
-                    help="Responde en consola las preguntas abiertas pendientes (guía §12)")
+    ap.add_argument("--responder", nargs="?", const="all", default=None, metavar="SPEC",
+                    help="Responde en consola las preguntas pendientes: sin valor = globales; "
+                         "con SPEC (ej. 001) = también las sugeridas de esa SPEC")
     ap.add_argument("--aprobar", metavar="SPEC",
                     help="Aprueba una SPEC (001 o slug); se niega si hay preguntas pendientes")
     ap.add_argument("--congelar", metavar="SPEC",
@@ -567,7 +758,7 @@ def main(argv: list[str] | None = None) -> int:
     control_path = Path(args.control) if args.control else CONTROL_PATH
     control = cargar_control(control_path)
     accion_ok = True
-    hubo_cambios = bool(args.responder)
+    hubo_cambios = False
 
     def _resolver_num(valor: str) -> int | None:
         mini = [SpecDoc(f.num, f.slug, f.nombre, "") for f in CATALOGO]
@@ -578,15 +769,34 @@ def main(argv: list[str] | None = None) -> int:
             return None
         return sel[0].num
 
-    if args.responder:
-        control = interactivo_responder(control)
+    if args.responder is not None:
+        spec_num = None
+        if args.responder != "all":
+            spec_num = _resolver_num(args.responder)
+            if spec_num is None:
+                return 1
+        control = interactivo_responder(control, spec_num=spec_num)
+        hubo_cambios = True
+
+    # §2.8: detectar cambios en SPECs aprobadas/congeladas antes de continuar
+    docs_all = construir_specs(historias, control=control)
+    mensajes = detectar_cambios(control, docs_all)
+    if mensajes:
+        for m in mensajes:
+            print(m, flush=True)
+        hubo_cambios = True
+        docs_all = construir_specs(historias, control=control)
 
     if args.aprobar:
         num = _resolver_num(args.aprobar)
         if num is None:
             accion_ok = False
         else:
-            ok, msg = aprobar(control, num, args.por or "Humano")
+            doc = next((d for d in docs_all if d.num == num), None)
+            ok, msg = aprobar(
+                control, num, args.por or "Humano",
+                markdown=doc.markdown if doc else None,
+            )
             print(msg, flush=True)
             accion_ok = accion_ok and ok
             hubo_cambios = hubo_cambios or ok
@@ -604,8 +814,9 @@ def main(argv: list[str] | None = None) -> int:
     if hubo_cambios:
         guardar_control(control, control_path)
         print(f"Control guardado en {control_path}", flush=True)
+        docs_all = construir_specs(historias, control=control)
 
-    docs = seleccionar(construir_specs(historias, control=control), args.spec)
+    docs = seleccionar(docs_all, args.spec)
     if not docs:
         print(f"Ninguna SPEC coincide con '{args.spec}'.", flush=True)
         return 1

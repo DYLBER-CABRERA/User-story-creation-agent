@@ -118,14 +118,27 @@ antes de aprobar, y el estado de cada SPEC sigue el ciclo
 `docs/specs/control.json` (compartido entre CLI y app):
 
 ```bash
-python -m generador.specs --responder                       # responde preguntas en consola
-python -m generador.specs --aprobar 001 --por "Prof. X"     # se niega si hay preguntas pendientes
-python -m generador.specs --congelar 001                    # solo desde APROBADA
+python -m generador.specs --responder 001                 # responde en consola las preguntas (las de 001 incluyen sugerencias)
+python -m generador.specs --responder                     # solo las globales (OPEN-Q + RNF)
+python -m generador.specs --aprobar 001 --por "Prof. X"   # se niega si hay preguntas pendientes
+python -m generador.specs --congelar 001                  # solo desde APROBADA
 ```
 
+Dos capacidades adicionales al estilo de la guía:
+
+- **§5 pasos 5-6 — preguntas sugeridas:** el agente genera preguntas (`SUG-*`)
+  cuando detecta información faltante (RNF sin definir, casos límite sin analizar,
+  dependencias pendientes, alcance ausente). Se muestran en la §15 y su respuesta
+  humana alimenta directamente las §6, §10 y §12 de la SPEC.
+- **§2.8 gestión de cambios:** el contenido de cada SPEC aprobada/congelada se
+  "huella" por secciones; si algo cambia al regenerar, la SPEC vuelve a borrador
+  con **versión incrementada (1.0 → 1.1)** y el §17 registra qué secciones
+  cambiaron (análisis de impacto). La re-aprobación sigue siendo humana.
+
 En la app, la sección "Especificaciones (SPEC)" tiene el expander de preguntas
-abiertas y los botones **Aprobar (v1.0)** / **Congelar (FROZEN)**; el botón de
-aprobar está deshabilitado mientras queden preguntas sin responder.
+(abiertas + sugeridas de la SPEC seleccionada), la advertencia si se detectan
+cambios en SPECs aprobadas, y los botones **Aprobar (v1.0)** / **Congelar (FROZEN)**;
+aprobar queda deshabilitado mientras queden preguntas sin responder.
 
 ## Estructura
 

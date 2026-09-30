@@ -16,6 +16,7 @@ from generador.specs import (
     cargar_control,
     construir_specs,
     congelar,
+    detectar_cambios,
     escribir_specs,
     guardar_control,
     preguntas_pendientes,
@@ -194,17 +195,34 @@ if historias:
     st.subheader("Especificaciones (SPEC)")
     control = cargar_control()
     docs = construir_specs(historias, control=control)
+    cambios = detectar_cambios(control, docs)
+    if cambios:
+        guardar_control(control)
+        docs = construir_specs(historias, control=control)
+        st.warning(
+            "**§2.8 Gestión de cambios** — contenido alterado en SPEC(s) aprobada(s); "
+            "se subió la versión y quedan pendientes de re-aprobación:\n\n"
+            + "\n".join(f"- {m}" for m in cambios)
+        )
     if st.button("Exportar SPECs a docs/specs/"):
         rutas = escribir_specs(docs)
         st.success(f"{len(rutas)} SPECs escritas en docs/specs/")
 
-    # ── control humano (guía §12): preguntas abiertas ──
-    pendientes = preguntas_pendientes(control)
-    with st.expander(f"Preguntas abiertas — {len(pendientes)} sin responder (control humano)"):
-        st.caption("La guía §12 exige resolverlas antes de poder aprobar una SPEC.")
+    sel = st.selectbox("Previsualizar SPEC", [d.titulo for d in docs])
+    doc_sel = next(d for d in docs if d.titulo == sel)
+
+    # ── control humano (guía §12): preguntas abiertas + sugeridas por el agente ──
+    pendientes = preguntas_pendientes(control, spec_num=doc_sel.num)
+    with st.expander(f"Preguntas de SPEC-{doc_sel.num:03d} — {len(pendientes)} sin responder"):
+        st.caption(
+            "Incluye las sugeridas por el agente (§5 pasos 5-6). "
+            "La guía §12 exige resolverlas todas antes de aprobar."
+        )
         campos = [
-            (q, st.text_input(f"{q['id']} — {q['pregunta']}",
-                              key=f"resp-{q['id']}-{len(pendientes)}"))
+            (q, st.text_input(
+                f"{q['id']} — {q['pregunta']}" + ("  [sugerida]" if q.get("generada") else ""),
+                key=f"resp-{q['id']}-{len(pendientes)}",
+            ))
             for q in pendientes
         ]
         if st.button("Guardar respuestas"):
@@ -218,9 +236,6 @@ if historias:
                 st.rerun()
             else:
                 st.warning("Escribe al menos una respuesta.")
-
-    sel = st.selectbox("Previsualizar SPEC", [d.titulo for d in docs])
-    doc_sel = next(d for d in docs if d.titulo == sel)
 
     # ── aprobación y congelación (guía §12) ──
     clave = f"{doc_sel.num:03d}"

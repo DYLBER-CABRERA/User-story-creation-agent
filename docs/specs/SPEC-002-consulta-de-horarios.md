@@ -6,7 +6,7 @@
 | Estado | Borrador v0.1 — pendiente de aprobación humana |
 | Funcionalidad | Consulta de horarios |
 | Actores | Pasajero |
-| Generado | 2026-09-27 (automático) |
+| Generado | 2026-09-29 (automático) |
 
 > Fuente: `docs/alcance-contexto-proyecto.md` + historias de usuario generadas.
 > Estructura según la sección 7 de la guía del Specification Agent.
@@ -90,10 +90,16 @@ Sophia Cardona. Plazo: 8 semanas desde cero.
 - **OPEN-Q-002** — **Pendiente**: ¿Las notificaciones salen fuera de la app o son avisos dentro de la misma?
 - **OPEN-Q-003** — **Pendiente**: ¿Qué ocurre con el ETA cuando una buseta no reporta su posición?
 
+**Preguntas sugeridas por el agente (§5 pasos 5-6):**
+
+- **SUG-RNF** — **Pendiente** (sugerida por el agente): El apartado de requisitos no funcionales (§6) sigue vacío. ¿Qué condiciones de calidad y valores verificables aplican al proyecto (p. ej. máximo X segundos de respuesta, Y % disponibilidad)?
+- **SUG-002-CASOS** — **Pendiente** (sugerida por el agente): Casos límite sin analizar (§10) para Consulta de horarios. ¿Qué casos deben especificarse (concurrencia, valores extremos, datos faltantes)?
+- **SUG-002-DEP** — **Pendiente** (sugerida por el agente): Dependencias pendientes (§12) para Consulta de horarios. ¿Hay dependencias externas (datos, APIs, permisos)? Responder 'ninguna' si no aplica.
+
 ## 16. Trazabilidad
 > **Pendiente:** sin historias para trazar.
 
 ## 17. Historial de cambios
 | Versión | Fecha | Cambio | Aprobación |
 |---------|-------|--------|------------|
-| 0.1 | 2026-09-27 | Generación automática desde alcance + historias | Pendiente (humana) |
+| 0.1 | 2026-09-29 | Generación automática desde alcance + historias | Pendiente (humana) |

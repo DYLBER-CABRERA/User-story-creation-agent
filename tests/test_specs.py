@@ -4,6 +4,7 @@ from generador.specs import (
     cargar_control,
     construir_specs,
     congelar,
+    detectar_cambios,
     escribir_specs,
     guardar_control,
     preguntas_pendientes,
@@ -119,7 +120,7 @@ def test_aprobar_bloqueado_por_preguntas_pendientes():
 
 def test_aprobar_congelar_cambian_estado_version_e_historial():
     control = _control_vacio()
-    for q in preguntas_pendientes(control):
+    for q in preguntas_pendientes(control, spec_num=1):
         registrar_respuesta(control, q["id"], f"Decisión sobre {q['id']}", "Profe")
 
     ok, msg = aprobar(control, 1, "Profe")
@@ -158,3 +159,65 @@ def test_control_se_persiste_en_archivo(tmp_path):
     guardar_control(cargado, ruta)
     assert "OPEN-Q-001" in cargar_control(ruta)["respuestas"]
     assert cargar_control(tmp_path / "no-existe.json")["estados"] == {}
+
+
+# ── §5 pasos 5-6: preguntas sugeridas por el agente ────────────────────
+
+def test_preguntas_sugeridas_por_el_agente():
+    control = _control_vacio()
+    pend = preguntas_pendientes(control, spec_num=1)
+    ids = [q["id"] for q in pend]
+    assert {"SUG-RNF", "SUG-001-CASOS", "SUG-001-DEP"} <= set(ids)
+
+    docs = construir_specs(None, control=control)
+    md = docs[0].markdown
+    assert "Preguntas sugeridas por el agente" in md and "SUG-RNF" in md
+    assert "SUG-001-CASOS" not in docs[4].markdown   # las sugerencias son por SPEC
+
+    for q in pend:
+        assert registrar_respuesta(control, q["id"], f"ok: {q['id']}", "Profe")
+    assert not [q for q in preguntas_pendientes(control, spec_num=1)
+                if str(q["id"]).startswith("SUG-")]
+    assert not registrar_respuesta(control, "SUG-XXX", "id inexistente")
+
+
+def test_respuestas_de_sugerencias_alimentan_las_secciones():
+    control = _control_vacio()
+    assert registrar_respuesta(control, "SUG-RNF", "Máximo 2 s, 99% disponibilidad", "Profe")
+    md = construir_specs(None, control=control)[0].markdown
+    sec6 = md.split("## 6.")[1].split("## 7.")[0]
+    assert "Máximo 2 s" in sec6 and "Pendiente:" not in sec6
+    assert "SUG-RNF** — **Respondida** (Profe" in md
+
+
+# ── §2.8 gestión de cambios ────────────────────────────────────────────
+
+def test_gestion_de_cambios_sube_version_y_registra_impacto():
+    control = _control_vacio()
+    for q in preguntas_pendientes(control, spec_num=1):
+        registrar_respuesta(control, q["id"], "ok", "Profe")
+    docs = construir_specs(None, control=control)
+    ok, msg = aprobar(control, 1, "Profe", markdown=docs[0].markdown)
+    assert ok and "APROBADA v1.0" in msg
+
+    docs = construir_specs(None, control=control)
+    assert detectar_cambios(control, docs) == []        # sin cambios, no hace nada
+
+    # simulo que el contenido aprobado ya no coincide con el actual
+    control["estados"]["001"]["hashes"]["1"] = "hash-viejo"
+    msgs = detectar_cambios(control, docs)
+    assert msgs and "v1.1" in msgs[0]
+    est = control["estados"]["001"]
+    assert est["estado"] == "borrador" and est["version"] == "1.1"
+    ev = control["eventos"][-1]
+    assert ev["evento"] == "Cambio detectado" and "§1" in ev["impacto"]
+
+    docs = construir_specs(None, control=control)
+    assert "Borrador v1.1" in docs[0].markdown
+    assert "re-aprobación" in docs[0].markdown
+
+    # re-aprobar conserva la versión 1.1 y vuelve a quedar estable
+    ok, msg = aprobar(control, 1, "Profe", markdown=docs[0].markdown)
+    assert ok and "APROBADA v1.1" in msg
+    assert control["estados"]["001"]["version"] == "1.1"
+    assert detectar_cambios(control, construir_specs(None, control=control)) == []
