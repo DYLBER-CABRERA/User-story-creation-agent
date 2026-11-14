@@ -49,6 +49,11 @@ def build_providers(
                 continue
             from langchain_google_genai import ChatGoogleGenerativeAI
 
+            kwargs: dict = {}
+            if s.gemini_max_output_tokens > 0:
+                # sin esto Gemini corta la respuesta en su default (~8192) y con
+                # muchas historias el JSON llega truncado → error de parseo
+                kwargs["max_output_tokens"] = s.gemini_max_output_tokens
             providers.append(
                 (
                     "gemini",
@@ -56,6 +61,7 @@ def build_providers(
                         model=modelos.get("gemini", s.gemini_model),
                         google_api_key=s.google_api_key,
                         temperature=s.temperature,
+                        **kwargs,
                     ),
                 )
             )

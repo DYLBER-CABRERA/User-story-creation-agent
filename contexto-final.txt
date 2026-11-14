@@ -1,18 +1,9 @@
-# BusetasApp Manizales — Alcance y contexto del proyecto
-
-> **Nota:** este documento define únicamente el **alcance funcional** del proyecto.
-> Las decisiones tecnológicas (plataforma, APIs, base de datos, arquitectura) **no se
-> definen aquí**: corresponden a una etapa posterior. Primero se construyen las
-> historias de usuario; después se decide cómo se implementan.
-
-## 1. Descripción del problema
-
+[PROBLEMA]
 El público en general desconoce las rutas, los horarios y los tiempos de llegada de
 las busetas en Manizales. No existe una forma sencilla de saber qué buseta pasa por
 dónde, a qué hora pasa, ni cuánto falta para que llegue a una parada.
 
-## 2. Descripción de la solución
-
+[SOLUCIÓN]
 **BusetasApp** es una aplicación para consultar las rutas de las busetas de Manizales.
 Permite:
 
@@ -25,8 +16,7 @@ Permite:
 Además, incluye un módulo para administradores (gestionar la operación) y un módulo
 para conductores (reportar la posición de la buseta durante el recorrido).
 
-## 3. Objetivos
-
+[OBJETIVOS]
 ### Objetivo general
 
 Facilitar la movilidad de los pasajeros de buseta en Manizales.
@@ -39,14 +29,12 @@ Facilitar la movilidad de los pasajeros de buseta en Manizales.
   llegada (ETA).
 * Ayudar a planificar un viaje indicando origen y destino.
 
-## 4. Público objetivo
-
+[PÚBLICO OBJETIVO]
 * Estudiantes y trabajadores que se desplazan en buseta a diario.
 * Visitantes o personas que no conocen las rutas de la ciudad.
 * Personal encargado de administrar la información de las rutas.
 
-## 5. Alcances del proyecto
-
+[ALCANCES — SOLO ESTAS FUNCIONALIDADES]
 * **Consulta de rutas:** catálogo de las rutas de buseta de Manizales, con recorrido
   dibujado en mapa, puntos de parada y sentido del trayecto.
 * **Consulta de horarios:** hora de inicio y fin de operación de cada ruta,
@@ -67,15 +55,13 @@ Facilitar la movilidad de los pasajeros de buseta en Manizales.
 * **Avisos generales:** el administrador publica cambios, suspensiones o festivos.
 * **Estadísticas básicas:** al administrador, sobre el uso de la app.
 
-## 6. Fuera de alcance
-
+[FUERA DE ALCANCE — NUNCA INVENTES NADA DE ESTO]
 * Pago de pasajes, tarjetas de recarga y cualquier manejo de dinero.
 * Transporte fuera de Manizales: taxis, transporte informal y rutas intermunicipales.
 * Definiciones tecnológicas: plataforma (web, móvil), APIs, base de datos y
   arquitectura — se deciden en una etapa posterior a las historias de usuario.
 
-## 7. Reglas de negocio
-
+[REGLAS DE NEGOCIO — RESPÉTALAS EN FLUJOS Y CRITERIOS]
 * **BR-01:** Cualquier persona puede consultar rutas, horarios y mapa sin crear una
   cuenta.
 * **BR-02:** Guardar favoritas y recibir notificaciones requiere un usuario
@@ -85,17 +71,17 @@ Facilitar la movilidad de los pasajeros de buseta en Manizales.
 * **BR-04:** Solo el administrador publica avisos generales.
 * **BR-05:** Solo el conductor reporta la posición de la buseta que está conduciendo,
   y únicamente durante su recorrido.
+* **BR-06:** La app es bilingüe (español/inglés): si el usuario es extranjero o
+  selecciona el idioma inglés, toda la aplicación se debe mostrar en inglés.
 
-## 8. Priorización
-
+[PRIORIZACIÓN]
 | Prioridad | Funcionalidades |
 |-----------|-----------------|
 | **Imprescindible** (entrega mínima) | Consulta de rutas, horarios, seguimiento en tiempo real con ETA, planificación de viaje, búsqueda y filtros, módulo administrativo, módulo de conductores |
 | **Deseable** | Favoritas, avisos generales, estadísticas básicas |
 | **Opcional** | Notificaciones, ampliación a Villamaría |
 
-## 9. Roles de la aplicación
-
+[ROLES]
 * **Pasajero:** consulta rutas, horarios y ubicación; planifica viajes; busca
   rutas; guarda favoritas y recibe avisos.
 * **Conductor:** consulta su ruta asignada, inicia y finaliza el recorrido, y
@@ -103,57 +89,54 @@ Facilitar la movilidad de los pasajeros de buseta en Manizales.
 * **Administrador:** gestiona rutas, horarios, paradas y busetas; publica avisos;
   consulta estadísticas básicas.
 
-## 10. Preguntas abiertas
-
-| ID | Pregunta | Responsable | Estado |
-|-----|----------|-------------|--------|
-| OPEN-Q-001 | ¿Los datos de las rutas los suministra la empresa de transporte o se cargan manualmente? | Equipo | Pendiente |
-| OPEN-Q-002 | ¿Las notificaciones salen fuera de la app o son avisos dentro de la misma? | Equipo | Pendiente |
-| OPEN-Q-003 | ¿Qué ocurre con el ETA cuando una buseta no reporta su posición? | Equipo | Pendiente |
-
-## 11. Entregables y criterios de éxito
-
-* Aplicación funcional con todas las funcionalidades **Imprescindibles** demostrables.
-* Historias de usuario bien construidas (formato estándar, INVEST) para los tres
-  roles.
-
-## 12. Equipo y plazo
-
-Proyecto académico. 4 integrantes: Dylber Cabrera, Miguel Rojas, Leidy Nieto,
-Sophia Cardona. Plazo: 8 semanas desde cero.
-
----
-
-## 13. Contexto para el generador de historias
-
-> Párrafo listo para pegar en el campo **"Contexto del proyecto"** de la app.
-
-```
-BusetasApp es una aplicación para consultar las rutas de las busetas de Manizales:
-catálogo de rutas con recorrido en mapa y paradas, horarios y días de operación
-(lunes a viernes, sábados, domingos y festivos), ubicación de las busetas en tiempo
-real con tiempo estimado de llegada (ETA) a una parada, planificación de viaje con
-origen y destino, y búsqueda por número o nombre de ruta, barrio o punto de interés.
-Incluye un módulo administrativo (crear y actualizar rutas, horarios, paradas y
-busetas, publicar avisos generales y ver estadísticas básicas) y un módulo de
-conductores (reportar la posición de la buseta durante el recorrido). El pasajero
-puede consultar sin cuenta; guardar favoritas y recibir notificaciones requiere
-usuario registrado. Fuera de alcance: pagos, tarjetas de recarga y transporte fuera
-de Manizales. Roles: pasajero, conductor, administrador.
-```
-
----
-
-## 14. Requisitos no funcionales
-
-> Los RNF medibles (tiempos, porcentajes, cadencias) **se generan por SPEC** y
-> sus valores los pone el equipo en la interfaz o la CLI (preguntas
-> `SUG-nnn-RNF-*`; guía §8: el Specification Agent no inventa cifras). Esta
-> sección conserva solo los requisitos **fijos** del proyecto, válidos para las
-> 12 SPECs.
-
+[REQUISITOS NO FUNCIONALES — SOLO VALORES YA DECIDIDOS, NO INVENTES LOS QUE FALTEN]
 | ID | Categoría | Requisito verificable | Valor |
 |----|-----------|----------------------|-------|
 | RNF-01 | Seguridad | Los datos viajan cifrados (HTTPS/TLS 1.2+) y no se registran credenciales ni datos personales en logs | Definido |
 | RNF-02 | Integridad | Las actualizaciones concurrentes del mismo recurso no pierden datos (control de versiones o bloqueo) | Definido |
 | RNF-03 | Compatibilidad | La interfaz funciona en navegadores móviles y escritorio modernos, desde pantallas de 320 px | Definido |
+
+[DECISIONES YA TOMADAS POR EL EQUIPO — NO LAS CONTRADIGAS]
+- OPEN-Q-001: los subministra la empresa (Web, 2026-09-29)
+- OPEN-Q-002: avisos dentro de la misma (Web, 2026-09-29)
+- OPEN-Q-003: le reporta al usuario que perdio la ubicacion y le dice este pendiente de la siguiente buseta con la misma ruta (Web, 2026-09-29)
+- SUG-001-CASOS: datos faltantes (Web, 2026-09-30)
+- SUG-001-DEP: Apis (Web, 2026-09-30)
+- SUG-001-RNF-01: 1 (Web, 2026-09-30)
+- SUG-001-RNF-02: 20 (Web, 2026-09-30)
+- SUG-001-RNF-03: 10 (Web, 2026-09-30)
+
+[RNF PROPUESTOS POR EL MODELO — CONSISTENCIA ENTRE CORRIDAS, AÚN SIN APROBAR; EL EQUIPO LOS CONFIRMA O CORRIGE]
+- SUG-002-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-002-RNF-02: 99.9 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-002-RNF-03: 5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-003-RNF-01: 2 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-003-RNF-02: 99.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-003-RNF-03: 0.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-004-RNF-01: 2.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-004-RNF-02: 99 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-004-RNF-03: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-005-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-005-RNF-02: 99.9 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-005-RNF-03: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-006-RNF-01: 2 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-006-RNF-02: 99.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-006-RNF-03: 10 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-007-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-007-RNF-02: 99.9 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-007-RNF-03: 0.2 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-008-RNF-01: 0.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-008-RNF-02: 99.9 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-008-RNF-03: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-009-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-009-RNF-02: 99.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-009-RNF-03: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-010-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-010-RNF-02: 99.9 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-010-RNF-03: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-011-RNF-01: 1 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-011-RNF-02: 99.5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-011-RNF-03: 5 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-012-RNF-01: 2 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-012-RNF-02: 99 (propuesta, pendiente de aprobación, 2026-10-06)
+- SUG-012-RNF-03: 60 (propuesta, pendiente de aprobación, 2026-10-06)

@@ -9,6 +9,7 @@ import streamlit as st
 
 from generador.config import get_settings
 from generador.generar import APP_NAME_DEFAULT, CONTEXT_DEFAULT, build_chain, generar_historias
+from generador.temas import TEMAS_POR_ROL
 from generador.llm import build_providers
 from generador.schemas import HistoriasGeneradas
 from generador.specs import (
@@ -44,7 +45,8 @@ def orden_de(proveedor: str) -> tuple[str, ...]:
 def get_chain(proveedor: str, modelo: str):
     """Cadena cacheada por (proveedor, modelo): cambiar cualquiera de los dos la reconstruye."""
     return build_chain(
-        build_providers(SETTINGS, order=orden_de(proveedor), modelos={proveedor: modelo})
+        build_providers(SETTINGS, order=orden_de(proveedor), modelos={proveedor: modelo}),
+        sin_fallbacks=True,
     )
 
 
@@ -66,7 +68,8 @@ def to_texto(historias: HistoriasGeneradas) -> str:
     partes = []
     for titulo, lista in [
         ("PASAJERO", historias.pasajero),
-        ("CONDUCTOR", historias.conductor),
+        ("JEFE DE OPERACIONES", historias.jefe_operaciones),
+        ("SECRETARÍA DE MOVILIDAD", historias.secretaria_movilidad),
         ("ADMINISTRADOR", historias.administrador),
     ]:
         if lista:
@@ -132,20 +135,20 @@ with st.sidebar:
         "Contexto del proyecto",
         contexto_proyecto() or CONTEXT_DEFAULT,
         height=180,
-        help="Generado desde docs/alcance-contexto-proyecto.md (§1, §2, §5, §6, §7, §9 "
-             "+ decisiones ya respondidas en control.json). Edítalo si quieres acotarlo.",
+        help="Generado desde docs/contexto-busetasapp.md. Edítalo si quieres acotarlo.",
     )
 
-    st.subheader("Cantidades")
-    n_pasajero = st.number_input("Pasajero", min_value=1, max_value=50, value=6)
-    n_conductor = st.number_input("Conductor", min_value=1, max_value=50, value=5)
-    n_admin = st.number_input("Administrador", min_value=1, max_value=50, value=4)
-    total = n_pasajero + n_conductor + n_admin
-    st.caption(f"Total: {total} historias, en **una sola llamada** al modelo.")
+    n_por_rol = {rol: len(temas) for rol, temas in TEMAS_POR_ROL.items()}
+    total = sum(n_por_rol.values())
+    st.caption(
+        f"Historias a generar: **{total}** en total — "
+        + ", ".join(f"{rol.replace('_', ' ')}: {n}" for rol, n in n_por_rol.items())
+        + ". La cantidad la determina el alcance del proyecto (temas.py)."
+    )
     if total > 20:
         st.caption(
             "⚠️ Con tantas historias los modelos pequeños pueden tardar varios minutos "
-            "o no alcanzar el contexto; si falla, reduce cantidades o sube `OLLAMA_NUM_CTX`."
+            "o no alcanzar el contexto; si falla, sube `OLLAMA_NUM_CTX`."
         )
 
     st.subheader("Depuración")
@@ -177,9 +180,6 @@ if st.button("Generar historias", type="primary", disabled=not proveedores):
         try:
             chain = get_chain(proveedor, modelo)
             historias, segundos = generar_historias(
-                n_pasajero=int(n_pasajero),
-                n_conductor=int(n_conductor),
-                n_admin=int(n_admin),
                 app_name=app_name,
                 context=contexto,
                 chain=chain,
@@ -197,13 +197,17 @@ if historias:
     detalle_prov = f" · con {PROVIDER_LABELS.get(usado, usado)}" if usado else ""
     st.success(f"Generado en {st.session_state.segundos:.1f} s · {len(historias.todas())} historias{detalle_prov}")
 
-    tab_pasajero, tab_conductor, tab_admin, tab_todas = st.tabs(
-        [f"Pasajero ({len(historias.pasajero)})", f"Conductor ({len(historias.conductor)})",
-         f"Administrador ({len(historias.administrador)})", "Todas"]
+    tab_pasajero, tab_jefe, tab_secretaria, tab_admin, tab_todas = st.tabs(
+        [f"Pasajero ({len(historias.pasajero)})",
+         f"Jefe Op. ({len(historias.jefe_operaciones)})",
+         f"Secretaría ({len(historias.secretaria_movilidad)})",
+         f"Administrador ({len(historias.administrador)})",
+         "Todas"]
     )
     for tab, lista in [
         (tab_pasajero, historias.pasajero),
-        (tab_conductor, historias.conductor),
+        (tab_jefe, historias.jefe_operaciones),
+        (tab_secretaria, historias.secretaria_movilidad),
         (tab_admin, historias.administrador),
     ]:
         with tab:
@@ -258,9 +262,10 @@ if historias:
     pendientes = preguntas_pendientes(control, spec_num=doc_sel.num)
     with st.expander(f"Preguntas de SPEC-{doc_sel.num:03d} — {len(pendientes)} sin responder"):
         st.caption(
-            "Las cifras de RNF (segundos, %) usan campos numéricos; el resto, texto. "
-            "Incluye las sugeridas por el agente (§5 pasos 5-6): la guía §12 exige "
-            "resolverlas todas antes de aprobar."
+            "Los RNF no son preguntas: los propone el modelo al generar historias "
+            "(etiquetados 'Modelo LLM (propuesta)') y se confirman al aprobar la SPEC. "
+            "Aquí solo quedan casos límite, dependencias y alcance (§5 pasos 5-6): "
+            "la guía §12 exige resolverlas todas antes de aprobar."
         )
         campos = []
         for q in pendientes:
@@ -268,34 +273,23 @@ if historias:
                 f"{q['id']} — {q['pregunta']}"
                 + ("  [sugerida]" if q.get("generada") else "")
             )
-            if q.get("campo") == "numero":
-                val = st.number_input(
-                    etiqueta,
-                    min_value=0.0,
-                    step=0.5 if q.get("unidad") == "s" else 1.0,
-                    value=None,
-                    key=f"resp-{q['id']}-{len(pendientes)}",
-                )
-                campos.append((q, val))
-            else:
-                campos.append((
-                    q,
-                    st.text_input(etiqueta, key=f"resp-{q['id']}-{len(pendientes)}"),
-                ))
+            campos.append((
+                q,
+                st.text_input(etiqueta, key=f"resp-{q['id']}-{len(pendientes)}"),
+            ))
         if st.button("Guardar respuestas"):
             guardadas = 0
             for q, texto in campos:
-                if texto is None:
+                if not texto or not texto.strip():
                     continue
-                valor = texto.strip() if isinstance(texto, str) else f"{texto:g}"
-                if valor and registrar_respuesta(control, q["id"], valor, "Web"):
+                if registrar_respuesta(control, q["id"], texto.strip(), "Web"):
                     guardadas += 1
             if guardadas:
                 guardar_control(control)
                 st.success(f"{guardadas} respuesta(s) guardada(s).")
                 st.rerun()
             else:
-                st.warning("Escribe al menos una respuesta (o pon una cifra en los RNF).")
+                st.warning("Escribe al menos una respuesta.")
 
     # ── aprobación y congelación (guía §12) ──
     clave = f"{doc_sel.num:03d}"

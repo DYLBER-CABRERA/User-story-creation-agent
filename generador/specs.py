@@ -4,7 +4,7 @@ Ensambla el documento de las 17 secciones de la guía del Specification Agent
 (docs/Guia - Specification Agent.md, sección 7) a partir de:
 
 - docs/alcance-contexto-proyecto.md -> contexto, alcance, reglas, restricciones,
-  fuera de alcance, preguntas abiertas y RNF medibles (§14) (fuente única de verdad).
+  fuera de alcance, preguntas abiertas y RNF medibles (fuente única de verdad).
 - las historias ya generadas        -> RF (§5), flujos (§8-9), criterios (§11)
   y trazabilidad (§16).
 
@@ -40,10 +40,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .schemas import HistoriasGeneradas
-from .temas import TEMAS_POR_ROL
+from .temas import TEMAS_POR_ROL  # noqa: F401 (reexportado para retrocompatibilidad)
 
 RAIZ = Path(__file__).resolve().parent.parent
-ALCANCE_PATH = RAIZ / "docs" / "alcance-contexto-proyecto.md"
+ALCANCE_PATH = RAIZ / "docs" / "contexto-busetasapp.md"
 SPECS_DIR = RAIZ / "docs" / "specs"
 CONTROL_PATH = SPECS_DIR / "control.json"
 
@@ -73,14 +73,14 @@ CATALOGO: tuple[Funcionalidad, ...] = (
                   "Ayudar al pasajero a planificar un viaje indicando origen y destino.",
                   "Planificación de viaje", ("BR-01",)),
     Funcionalidad(5, "busqueda-y-filtros", "Búsqueda y filtros", ("Pasajero",),
-                  "Permitir buscar rutas por número, nombre, barrio o punto de interés.",
+                  "Permitir buscar rutas por número, nombre, barrio o punto de interés (hitos urbanos).",
                   "Búsqueda y filtros", ("BR-01",)),
-    Funcionalidad(6, "modulo-administrativo", "Módulo administrativo", ("Administrador",),
-                  "Permitir al administrador crear y actualizar rutas, horarios, paradas y busetas.",
-                  "Módulo administrativo", ("BR-03",)),
-    Funcionalidad(7, "modulo-de-conductores", "Módulo de conductores", ("Conductor",),
-                  "Permitir al conductor consultar su ruta asignada, iniciar/finalizar el recorrido y reportar la posición de la buseta.",
-                  "Módulo de conductores", ("BR-05",)),
+    Funcionalidad(6, "modulo-jefe-operaciones", "Módulo del jefe de operaciones", ("Jefe de Operaciones",),
+                  "Permitir al jefe de operaciones asignar conductores y busetas a rutas, ingresar datos de rutas y definir el rodamiento del día.",
+                  "Asignación operativa y rodamiento (jefe de operaciones)", ("BR-03", "BR-06", "BR-09")),
+    Funcionalidad(7, "modulo-secretaria-movilidad", "Módulo de la Secretaría de Movilidad", ("Secretaría de Movilidad",),
+                  "Permitir a la Secretaría de Movilidad gestionar las rutas, paraderos y cambios de movilidad de la ciudad.",
+                  "Gestión de rutas, paraderos y cambios de ciudad (Secretaría de Movilidad)", ("BR-04", "BR-08")),
     Funcionalidad(8, "favoritas", "Favoritas", ("Pasajero",),
                   "Permitir al pasajero guardar rutas o paradas frecuentes para encontrarlas rápido.",
                   "Favoritas", ("BR-02",)),
@@ -90,20 +90,28 @@ CATALOGO: tuple[Funcionalidad, ...] = (
     Funcionalidad(10, "uso-sin-cuenta", "Uso sin cuenta", ("Pasajero",),
                   "Permitir consultar la app sin obligar a crear una cuenta.",
                   "Uso sin cuenta", ("BR-01", "BR-02")),
-    Funcionalidad(11, "avisos-generales", "Avisos generales", ("Administrador",),
-                  "Permitir al administrador publicar avisos generales (cambios, suspensiones, festivos).",
-                  "Avisos generales", ("BR-04",)),
-    Funcionalidad(12, "estadisticas-basicas", "Estadísticas básicas", ("Administrador",),
-                  "Mostrar al administrador estadísticas básicas de uso de la app.",
+    Funcionalidad(11, "avisos-generales", "Avisos generales", ("Jefe de Operaciones",),
+                  "Permitir al jefe de operaciones publicar avisos generales de su empresa (cambios, suspensiones, horarios de festivos).",
+                  "Avisos generales", ("BR-05",)),
+    Funcionalidad(12, "estadisticas-basicas", "Estadísticas básicas", ("Jefe de Operaciones",),
+                  "Mostrar al jefe de operaciones estadísticas básicas de uso de la app para su empresa.",
                   "Estadísticas básicas", ("BR-03",)),
+    Funcionalidad(13, "modulo-administrador", "Módulo del administrador", ("Administrador",),
+                  "Permitir al administrador gestionar usuarios, roles, empresas y la configuración global de la plataforma.",
+                  "Administración global", ("BR-07",)),
 )
 
 # Índice de tema base -> número de SPEC, por rol (alineado con temas.py).
 # El índice de la historia se toma con módulo para cubrir las variantes.
+# Pasajero (12 temas): 1=rutas(x2), 2=horarios(x2), 3=GPS(x2), 4=viaje, 5=busqueda(x2), 8=favoritas, 9=notif, 10=sin-cuenta
+# Jefe de operaciones (6 temas): 6=modulo-jefe(x4), 11=avisos, 12=estadisticas
+# Secretaria de Movilidad (5 temas): 7=modulo-secretaria(x5)
+# Administrador (5 temas): 13=modulo-admin(x5)
 MAPEO_POR_ROL: dict[str, tuple[int, ...]] = {
-    "pasajero": (1, 1, 2, 3, 3, 4, 5, 8, 9, 10),
-    "conductor": (7, 7, 7, 7, 7),
-    "administrador": (6, 6, 6, 11, 12),
+    "pasajero": (1, 1, 2, 2, 3, 3, 4, 5, 5, 8, 9, 10),
+    "jefe_operaciones": (6, 6, 6, 6, 11, 12),
+    "secretaria_movilidad": (7, 7, 7, 7, 7),
+    "administrador": (13, 13, 13, 13, 13),
 }
 
 # Operación principal de cada SPEC, para redactar sus RNF (guía §2.2/§8).
@@ -113,19 +121,21 @@ RNF_OPERACION: dict[int, str] = {
     3: "la actualización de posición y ETA",
     4: "la planificación de viaje",
     5: "la búsqueda y los filtros",
-    6: "las operaciones del módulo administrativo",
-    7: "el reporte de posición del conductor",
+    6: "las operaciones del módulo del jefe de operaciones",
+    7: "las operaciones del módulo de la Secretaría de Movilidad",
     8: "la gestión de favoritas",
     9: "el envío de notificaciones",
     10: "la consulta sin cuenta",
-    11: "la publicación de avisos",
-    12: "la consulta de estadísticas",
+    11: "la publicación de avisos generales",
+    12: "la consulta de estadísticas básicas",
+    13: "las operaciones del módulo del administrador",
 }
 
-# RNF medibles generados por SPEC: cada modelo produce una fila en la §6 y una
-# pregunta numérica SUG-{nnn}-RNF-{suf}; la cifra la pone el equipo en la
-# interfaz/CLI (guía §8: el agente NO inventa valores). `RNF_OPERACION` lleva
-# artículo; `_de()` lo flexiona para usarlo tras una preposición (evita "de el").
+# RNF medibles generados por SPEC: cada modelo produce una fila en la §6 y un
+# valor que propone el LLM al generar historias (`guardar_propuestas_rnf`);
+# el equipo lo confirma al aprobar la SPEC (guía §2.2/§8: una propuesta no es
+# decisión). `RNF_OPERACION` lleva artículo; `_de()` lo flexiona para usarlo
+# tras una preposición (evita "de el").
 RNF_MODELOS: tuple[dict, ...] = (
     {
         "suf": "01", "categoria": "Rendimiento", "unidad": "s", "unidad_txt": "segundos",
@@ -197,35 +207,35 @@ def _sec(secciones: dict[str, str], num: int) -> str:
     for titulo, cuerpo in secciones.items():
         if titulo.startswith(f"{num}."):
             return cuerpo
-    return "_Ver docs/alcance-contexto-proyecto.md._"
+    return "_Ver docs/contexto-busetasapp.md._"
 
 
 def _bullet(texto: str, clave: str) -> str | None:
-    """Extrae '* **Clave:** valor...' (con sus líneas de continuación)."""
+    """Extrae '- **Clave:** valor...' o '* **Clave:** valor...' con sus líneas de continuación."""
     lineas = (texto or "").splitlines()
-    prefijo = f"* **{clave}:**"
-    for i, ln in enumerate(lineas):
-        if ln.startswith(prefijo):
-            trozos = [ln[len(prefijo):]]
-            for cont in lineas[i + 1:]:
-                if not cont.strip() or cont.lstrip().startswith(("* ", "## ")):
-                    break
-                trozos.append(cont.strip())
-            return " ".join(" ".join(trozos).split())
+    for marcador in (f"- **{clave}:**", f"* **{clave}:**"):
+        for i, ln in enumerate(lineas):
+            if ln.startswith(marcador):
+                trozos = [ln[len(marcador):]]
+                for cont in lineas[i + 1:]:
+                    if not cont.strip() or cont.lstrip().startswith(("- ", "* ", "## ")):
+                        break
+                    trozos.append(cont.strip())
+                return " ".join(" ".join(trozos).split())
     return None
 
 
 def _reglas(texto: str) -> dict[str, str]:
-    """{'BR-01': 'texto...', ...} desde los bullets de §7."""
+    """{'BR-01': 'texto...', ...} desde los bullets de §7. Soporta '- **BR-N:**' y '* **BR-N:**'."""
     regs: dict[str, str] = {}
     lineas = (texto or "").splitlines()
     i = 0
     while i < len(lineas):
-        m = re.match(r"\* \*\*(BR-\d+):\*\*\s*(.*)", lineas[i])
+        m = re.match(r"[*\-] \*\*(BR-\d+):\*\*\s*(.*)", lineas[i])
         if m:
             clave, txt = m.group(1), [m.group(2)]
             j = i + 1
-            while j < len(lineas) and lineas[j].strip() and not lineas[j].startswith(("* ", "## ")):
+            while j < len(lineas) and lineas[j].strip() and not lineas[j].startswith(("- ", "* ", "## ")):
                 txt.append(lineas[j].strip())
                 j += 1
             regs[clave] = " ".join(" ".join(txt).split())
@@ -271,42 +281,33 @@ def _preguntas(cuerpo: str) -> list[dict]:
 
 
 def _todas_las_preguntas(alcance_path: Path = ALCANCE_PATH) -> list[dict]:
-    return _preguntas(_sec(_leer_alcance(alcance_path), 10))
+    return _preguntas(_sec_titulo(_leer_alcance(alcance_path), "preguntas abiertas"))
+
+
+def _sec_titulo(secciones: dict[str, str], busqueda: str) -> str:
+    """Cuerpo de la sección cuyo título contiene `busqueda` (sin distinguir
+    mayúsculas). Inmune a renumeraciones del documento de alcance."""
+    b = busqueda.lower()
+    for titulo, cuerpo in secciones.items():
+        if b in titulo.lower():
+            return cuerpo
+    return ""
 
 
 def _rnf_seccion(secciones: dict[str, str]) -> str:
-    """Cuerpo de la §14 del alcance (RNF), o '' si el documento no la tiene."""
-    cuerpo = _sec(secciones, 14)
-    return "" if cuerpo.startswith("_Ver") else cuerpo
-
-
-def _rnf_pendientes(secciones: dict[str, str]) -> list[str]:
-    """IDs de RNF de la §14 del alcance cuyo valor sigue '[por definir]'."""
-    pendientes = []
-    for linea in (_rnf_seccion(secciones) or "").splitlines():
-        linea = linea.strip()
-        if linea.startswith("| RNF-") and "[por definir]" in linea:
-            pendientes.append(linea.strip("|").split("|")[0].strip())
-    return pendientes
+    """Cuerpo de la sección de Requisitos no funcionales del alcance (buscada
+    por título, no por número), o '' si el documento no la tiene."""
+    return _sec_titulo(secciones, "requisitos no funcionales")
 
 
 def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
     """Preguntas que el agente propone al detectar información faltante o ambigua
-    (guía §5, pasos 5-6). IDs estables para que las respuestas persistan."""
+    (guía §5, pasos 5-6). IDs estables para que las respuestas persistan.
+
+    Los RNF NO son preguntas: los propone el modelo LLM al generar historias
+    (`guardar_propuestas_rnf`) y el equipo los aprueba al aprobar la SPEC."""
     func = next(f for f in CATALOGO if f.num == num)
     generadas: list[dict] = [
-        {
-            # cifras medibles por SPEC: el campo numérico de la interfaz los captura
-            "id": f"SUG-{num:03d}-RNF-{m['suf']}",
-            "pregunta": f"{m['ui']} de {func.nombre} — en {m['unidad_txt']}",
-            "responsable": "Equipo",
-            "generada": True,
-            "campo": "numero",
-            "unidad": m["unidad"],
-        }
-        for m in RNF_MODELOS
-    ]
-    generadas += [
         {
             "id": f"SUG-{num:03d}-CASOS",
             "pregunta": (
@@ -326,30 +327,6 @@ def preguntas_generadas(num: int, secciones: dict[str, str]) -> list[dict]:
             "generada": True,
         },
     ]
-    pend_rnf = _rnf_pendientes(secciones)
-    if pend_rnf:
-        generadas.insert(0, {
-            "id": "SUG-RNF",
-            "pregunta": (
-                "Valores medibles de RNF sin definir en §14 del alcance "
-                "(guía §8: el agente NO debe inventar cifras): "
-                f"{', '.join(pend_rnf)}. "
-                "¿Cuál es el valor de cada uno (segundos, % de disponibilidad, etc.)?"
-            ),
-            "responsable": "Equipo",
-            "generada": True,
-        })
-    elif not _rnf_seccion(secciones):
-        generadas.insert(0, {
-            "id": "SUG-RNF",
-            "pregunta": (
-                "El documento de alcance no tiene la §14 de requisitos no funcionales. "
-                "¿Qué condiciones de calidad y valores verificables aplican al proyecto "
-                "(p. ej. máximo X segundos de respuesta, Y % disponibilidad)?"
-            ),
-            "responsable": "Equipo",
-            "generada": True,
-        })
     if _bullet(_sec(secciones, 5), func.clave_alcance) is None:
         generadas.append({
             "id": f"SUG-{num:03d}-ALC",
@@ -372,20 +349,14 @@ def preguntas_pendientes(
     alcance_path: Path = ALCANCE_PATH,
     spec_num: int | None = None,
 ) -> list[dict]:
-    """Sin responder: las estáticas del alcance +, si se indica `spec_num`, las
-    sugeridas por el agente para esa SPEC. Sin `spec_num`: estáticas + SUG-RNF
-    (respaldo) + los RNF numéricos de las 12 SPECs."""
+    """Sin responder: las estáticas del alcance (§10) y, si se indica `spec_num`,
+    las sugeridas por el agente para esa SPEC (CASOS/DEP/ALC). Los RNF ya no son
+    preguntas: los propone el modelo LLM (`guardar_propuestas_rnf`)."""
     respuestas = control.get("respuestas") or {}
     secciones = _leer_alcance(alcance_path)
-    pend = [q for q in _preguntas(_sec(secciones, 10)) if q["id"] not in respuestas]
+    pend = [q for q in _preguntas(_sec_titulo(secciones, "preguntas abiertas")) if q["id"] not in respuestas]
     if spec_num is not None:
         pend += [q for q in preguntas_generadas(spec_num, secciones) if q["id"] not in respuestas]
-    else:
-        pend += [q for q in preguntas_generadas(1, secciones)
-                 if q["id"] == "SUG-RNF" and q["id"] not in respuestas]
-        for f in CATALOGO:
-            pend += [q for q in preguntas_generadas(f.num, secciones)
-                     if q.get("campo") == "numero" and q["id"] not in respuestas]
     return pend
 
 
@@ -397,9 +368,11 @@ def registrar_respuesta(
     alcance_path: Path = ALCANCE_PATH,
 ) -> bool:
     secciones = _leer_alcance(alcance_path)
-    validos = {q["id"] for q in _preguntas(_sec(secciones, 10))}
+    validos = {q["id"] for q in _preguntas(_sec_titulo(secciones, "preguntas abiertas"))}
     for f in CATALOGO:
         validos.update(q["id"] for q in preguntas_generadas(f.num, secciones))
+        # RNF: siguen siendo corregibles por el equipo aunque no sean preguntas
+        validos.update(f"SUG-{f.num:03d}-RNF-{m['suf']}" for m in RNF_MODELOS)
     if pregunta_id not in validos:
         return False
     control.setdefault("respuestas", {})[pregunta_id] = {
@@ -410,17 +383,47 @@ def registrar_respuesta(
     return True
 
 
+def guardar_propuestas_rnf(rnfs, path: Path = CONTROL_PATH) -> int:
+    """Guarda los RNF propuestos por el LLM (salida `rnf_especs` de la generación
+    de historias) en control.json con responsable 'Modelo LLM (propuesta)'.
+
+    La propuesta NO es una decisión (guía §11): la decisión es aprobar la SPEC.
+    No pisa respuestas humanas previas. Devuelve cuántas cifras guardó."""
+    if not rnfs:
+        return 0
+    control = cargar_control(path)
+    respuestas = control.setdefault("respuestas", {})
+    atributos = {"01": "rendimiento_s", "02": "disponibilidad_pct", "03": "actualizacion_min"}
+    hoy = datetime.date.today().isoformat()
+    guardadas = 0
+    for r in rnfs:
+        for suf, attr in atributos.items():
+            qid = f"SUG-{r.num:03d}-RNF-{suf}"
+            if qid in respuestas:
+                continue
+            respuestas[qid] = {
+                "respuesta": f"{getattr(r, attr):g}",
+                "responsable": "Modelo LLM (propuesta)",
+                "fecha": hoy,
+            }
+            guardadas += 1
+    if guardadas:
+        guardar_control(control, path)
+    return guardadas
+
+
 def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = None) -> str:
     """Contexto para el LLM del generador de historias, construido desde el
     documento de alcance (fuente única de verdad) en lugar de texto hardcodeado.
 
     Incluye §1 problema, §2 solución, §3 objetivos, §4 público, §5 alcances,
-    §6 fuera de alcance, §7 reglas de negocio, §8 priorización, §9 roles y la §14
-    de RNF (solo las filas cuyo valor ya está decidido), más las decisiones
-    humanas ya resueltas (control.json). Excluye §10 preguntas abiertas y §11-§13
-    (entregables, equipo/plazo, párrafo de contexto): las decisiones pendientes
-    no se le pasan al modelo (guía §8: no debe inventar valores). ~4.7 KB, seguro
-    para la ventana de 8192 tokens de qwen2.5:3b."""
+    §6 fuera de alcance, §7 reglas de negocio, §8 priorización, §9 roles y la
+    sección de Requisitos no funcionales (solo filas con valor decidido o
+    propuesto), las decisiones humanas ya resueltas (control.json) y, en bloque
+    aparte, los RNF propuestos por el modelo (aún sin aprobar).
+    Excluye §10-§11 (preguntas, entregables) y §12 (párrafo de contexto de
+    este generador): las decisiones pendientes no se le pasan al modelo
+    (guía §8: no debe inventar valores)."""
     secciones = _leer_alcance(alcance_path)
     if not secciones:
         return ""
@@ -439,12 +442,13 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
         ("PROBLEMA", _sec(secciones, 1)),
         ("SOLUCIÓN", _sec(secciones, 2)),
         ("OBJETIVOS", _sec(secciones, 3)),
-        ("PÚBLICO OBJETIVO", _sec(secciones, 4)),
+        # §4 del nuevo documento = Roles (4 en total)
+        ("ROLES", _sec(secciones, 4)),
         ("ALCANCES — SOLO ESTAS FUNCIONALIDADES", _sec(secciones, 5)),
         ("FUERA DE ALCANCE — NUNCA INVENTES NADA DE ESTO", _sec(secciones, 6)),
         ("REGLAS DE NEGOCIO — RESPÉTALAS EN FLUJOS Y CRITERIOS", _sec(secciones, 7)),
-        ("PRIORIZACIÓN", _sec(secciones, 8)),
-        ("ROLES", _sec(secciones, 9)),
+        # Priorización está en §10 del nuevo documento; búsqueda por título para robustez
+        ("PRIORIZACIÓN", _sec_titulo(secciones, "priorización")),
         ("REQUISITOS NO FUNCIONALES — SOLO VALORES YA DECIDIDOS, NO INVENTES LOS QUE FALTEN",
          cuerpo_rnf),
     ]
@@ -454,25 +458,45 @@ def contexto_proyecto(alcance_path: Path = ALCANCE_PATH, control: dict | None = 
         if cuerpo and not cuerpo.startswith("_Ver")
     ]
     respuestas = control.get("respuestas") or {}
-    if respuestas:
+    humanas = {k: v for k, v in respuestas.items()
+               if "(propuesta)" not in str(v.get("responsable", ""))}
+    propuestas = {k: v for k, v in respuestas.items()
+                  if "(propuesta)" in str(v.get("responsable", ""))}
+    if humanas:
         decisiones = "\n".join(
             f"- {pid}: {r.get('respuesta', '')} ({r.get('responsable', '?')}, {r.get('fecha', '?')})"
-            for pid, r in sorted(respuestas.items())
+            for pid, r in sorted(humanas.items())
         )
         partes.append(
             "[DECISIONES YA TOMADAS POR EL EQUIPO — NO LAS CONTRADIGAS]\n" + decisiones
+        )
+    if propuestas:
+        # guía §11: una propuesta del modelo no es una decisión humana
+        lineas = "\n".join(
+            f"- {pid}: {r.get('respuesta', '')} (propuesta, pendiente de aprobación, {r.get('fecha', '?')})"
+            for pid, r in sorted(propuestas.items())
+        )
+        partes.append(
+            "[RNF PROPUESTOS POR EL MODELO — CONSISTENCIA ENTRE CORRIDAS, "
+            "AÚN SIN APROBAR; EL EQUIPO LOS CONFIRMA O CORRIGE]\n" + lineas
         )
     return "\n\n".join(partes)
 
 
 def _info_secciones(markdown: str) -> dict[str, tuple[str, str]]:
-    """{num_sección: (título, sha256(título+cuerpo))} para §1..§16 (cabecera y §17 excluidas)."""
+    """{num_sección: (título, sha256(título+cuerpo))} para §1..§16 (cabecera y §17 excluidas).
+
+    La nota inicial de §6 cambia al aprobar (borrador vs aprobada); se normaliza
+    antes de hashear para que ese cambio de estado no cuente como contenido
+    alterado y dispare una re-aprobación fantasma."""
     info: dict[str, tuple[str, str]] = {}
     patron = re.compile(r"(?m)^## (\d+)\. ([^\n]+)\n(.*?)(?=^## \d+\. |\Z)", re.S)
+    nota6 = re.compile(r"> Valores medibles por funcionalidad[^\n]*")
     for m in patron.finditer(markdown):
         num, titulo, cuerpo = m.group(1), m.group(2).strip(), m.group(3)
         if num == "17":
             continue
+        cuerpo = nota6.sub("> Valores medibles por funcionalidad (nota según estado)", cuerpo)
         digesto = hashlib.sha256(f"{titulo}\n{cuerpo}".encode("utf-8")).hexdigest()
         info[num] = (titulo, digesto)
     return info
@@ -595,7 +619,7 @@ def interactivo_responder(
 
 
 def _md_preguntas(secciones: dict[str, str], control: dict, num: int) -> str:
-    cuerpo = _sec(secciones, 10)
+    cuerpo = _sec_titulo(secciones, "preguntas abiertas")
     respuestas = control.get("respuestas") or {}
 
     def _fila(q: dict) -> str:
@@ -713,8 +737,9 @@ def _construir_markdown(
     )
     alcance_func = _bullet(_sec(secciones, 5), func.clave_alcance)
 
-    # §6:3 RNF medibles por SPEC (guía §2.2/§8) que el equipo define en §15 +
-    # las filas fijas (seguridad/integridad/compatibilidad) de la §14 del alcance
+    # §6: 3 RNF medibles por SPEC (guía §2.2/§8): los propone el LLM en la
+    # corrida de historias; si aún no hay propuesta, quedan [por definir] +
+    # las filas fijas (seguridad/integridad/compatibilidad) del alcance
     r_rnf = _respuesta(control, "SUG-RNF")
     filas_rnf: list[str] = []
     sin_valor: list[str] = []
@@ -737,19 +762,33 @@ def _construir_markdown(
         ln.strip() for ln in (_rnf_seccion(secciones) or "").splitlines()
         if ln.strip().startswith("| RNF-")
     ]
+    # la nota de §6 depende del estado: en borrador explica el mecanismo de
+    # propuestas; una vez aprobada/congelada, el equipo ya confirmó los valores
+    if estado == "borrador":
+        nota_rnf = (
+            "> Valores medibles por funcionalidad. Los propone el modelo LLM al "
+            "generar historias (etiquetados **Modelo LLM (propuesta)**) y el equipo "
+            "los confirma al aprobar esta SPEC: una propuesta no es una decisión "
+            "(guía §8/§11)."
+        )
+    else:
+        nota_rnf = (
+            "> Valores medibles por funcionalidad **confirmados por el equipo al "
+            "aprobar esta SPEC**: una propuesta del modelo no se vuelve decisión "
+            "sin aprobación humana (guía §8/§11)."
+        )
     md6 = (
-        "> Valores medibles por funcionalidad, definidos por el equipo en §15 "
-        "(guía §8: el agente no inventa cifras). Las filas fijas de seguridad, "
-        "integridad y compatibilidad vienen de "
-        "`docs/alcance-contexto-proyecto.md` §14.\n\n"
+        nota_rnf
+        + " Las filas fijas de seguridad, integridad y compatibilidad vienen de "
+        "`docs/alcance-contexto-proyecto.md`.\n\n"
         "| ID | Categoría | Requisito verificable | Valor |\n"
         "|----|-----------|----------------------|-------|\n"
         + "\n".join(filas_rnf + filas_fijas)
     )
     if sin_valor:
         md6 += (
-            f"\n\nValores **[por definir]** → decisiones abiertas en §15: "
-            f"{', '.join(sin_valor)}."
+            f"\n\nValores **[por definir]** → sin propuesta aún: "
+            f"{', '.join(sin_valor)} (genere historias para que el modelo los proponga)."
         )
     if r_rnf:  # respaldo: pregunta global SUG-RNF si el alcance la planteó
         md6 += (
@@ -757,6 +796,15 @@ def _construir_markdown(
             f"({r_rnf.get('responsable', '?')}, {r_rnf.get('fecha', '?')}):** "
             f"{r_rnf.get('respuesta', '')}"
         )
+    # §13: del alcance si documenta restricciones; si no, la puerta a la etapa
+    # de arquitectura (guía §7/§2.10). Nunca copia contenido de otras secciones.
+    restricciones_md = _sec_titulo(secciones, "restricciones") or (
+        "- No hay restricciones adicionales documentadas en el documento de "
+        "alcance. Las restricciones técnicas (plataforma, APIs, base de datos, "
+        "despliegue) se definen en la etapa de arquitectura (guía §2.10) y se "
+        "agregan aquí cuando existan."
+    )
+
     r_casos = _respuesta(control, f"SUG-{n:03d}-CASOS")
     md10_cierre = (
         f"**Casos límite definidos por el equipo ({r_casos.get('responsable', '?')}, "
@@ -840,7 +888,7 @@ Ver también **Fuera de alcance** (§14 de esta SPEC).
 {md12}
 
 ## 13. Restricciones
-{_sec(secciones, 12)}
+{restricciones_md}
 
 ## 14. Fuera de alcance
 {_sec(secciones, 6)}
@@ -873,7 +921,8 @@ def construir_specs(
     if historias is not None:
         for rol, lista in (
             ("pasajero", historias.pasajero),
-            ("conductor", historias.conductor),
+            ("jefe_operaciones", historias.jefe_operaciones),
+            ("secretaria_movilidad", historias.secretaria_movilidad),
             ("administrador", historias.administrador),
         ):
             for i, h in enumerate(lista):

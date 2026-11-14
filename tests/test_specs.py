@@ -10,6 +10,7 @@ from generador.specs import (
     detectar_cambios,
     escribir_specs,
     guardar_control,
+    guardar_propuestas_rnf,
     preguntas_generadas,
     preguntas_pendientes,
     registrar_respuesta,
@@ -22,22 +23,33 @@ VACIO = {"respuestas": {}, "estados": {}, "eventos": []}
 
 
 def test_mapeo_historia_a_spec():
-    # pasajero: temas 1-2 -> SPEC 001, tema 3 -> 002, tema 8 -> 008...
-    assert spec_de_historia("pasajero", 0) == 1
-    assert spec_de_historia("pasajero", 2) == 2
-    assert spec_de_historia("pasajero", 3) == 3
-    assert spec_de_historia("pasajero", 7) == 8
-    assert spec_de_historia("pasajero", 9) == 10
-    # variante del tema 1 (índice 10) sigue en la SPEC 001
-    assert spec_de_historia("pasajero", 10) == 1
-    assert spec_de_historia("conductor", 4) == 7
-    assert spec_de_historia("administrador", 3) == 11
-    assert spec_de_historia("administrador", 4) == 12
+    # MAPEO pasajero: (1,1,2,2,3,3,4,5,5,8,9,10)
+    assert spec_de_historia("pasajero", 0) == 1    # "Visualizar rutas en mapa" -> SPEC 1
+    assert spec_de_historia("pasajero", 1) == 1    # "Ver recorrido en mapa" -> SPEC 1
+    assert spec_de_historia("pasajero", 2) == 2    # "Consultar horarios" -> SPEC 2
+    assert spec_de_historia("pasajero", 3) == 2    # "Ver frecuencia" -> SPEC 2
+    assert spec_de_historia("pasajero", 4) == 3    # "GPS" -> SPEC 3
+    assert spec_de_historia("pasajero", 7) == 5    # "Buscar por numero" -> SPEC 5
+    assert spec_de_historia("pasajero", 9) == 8    # "Favoritas" -> SPEC 8
+    assert spec_de_historia("pasajero", 11) == 10  # "Sin cuenta" -> SPEC 10
+    # variante (indice >= 12) usa modulo: 12%12=0 -> 1
+    assert spec_de_historia("pasajero", 12) == 1
+    # MAPEO jefe_operaciones: (6,6,6,6,11,12)
+    assert spec_de_historia("jefe_operaciones", 0) == 6
+    assert spec_de_historia("jefe_operaciones", 3) == 6
+    assert spec_de_historia("jefe_operaciones", 4) == 11
+    assert spec_de_historia("jefe_operaciones", 5) == 12
+    # MAPEO secretaria_movilidad: todo -> 7
+    assert spec_de_historia("secretaria_movilidad", 0) == 7
+    assert spec_de_historia("secretaria_movilidad", 4) == 7
+    # MAPEO administrador: todo -> 13
+    assert spec_de_historia("administrador", 0) == 13
+    assert spec_de_historia("administrador", 4) == 13
 
 
-def test_son_12_specs_y_cada_una_tiene_las_17_secciones():
+def test_son_13_specs_y_cada_una_tiene_las_17_secciones():
     docs = construir_specs(None, control=VACIO)
-    assert len(docs) == 12 == len(CATALOGO)
+    assert len(docs) == 13 == len(CATALOGO)
     for d in docs:
         for n in range(1, 18):
             assert f"## {n}." in d.markdown, f"{d.titulo} sin sección {n}"
@@ -64,38 +76,42 @@ def test_spec_sin_historias_marca_pendientes():
     docs = construir_specs(None, control=VACIO)
     d = docs[0]
     assert "sin historias asignadas" in d.markdown
-    # §6: 3 RNF medibles por SPEC con las cifras sin responder (guía §8) +
-    # las filas fijas del alcance §14 (seguridad, integridad, compatibilidad)
+    # §6: 3 RNF medibles por SPEC con las cifras sin propuesta todavía (guía §8) +
+    # las filas fijas del alcance (seguridad, integridad, compatibilidad)
     assert "| RNF-001-01 |" in d.markdown and "[por definir]" in d.markdown
-    assert "SUG-001-RNF-01" in d.markdown          # decisión abierta en §15
+    assert "SUG-001-RNF-01" in d.markdown          # cifra sin propuesta, citada en §6
     assert "| RNF-01 |" in d.markdown
+    assert "sin propuesta aún" in d.markdown       # aviso: genere historias para proponer
 
 
 def test_reglas_y_fuera_de_alcance_vienen_del_documento():
     docs = construir_specs(None, control=VACIO)
+    # SPEC-006 ahora es el modulo del jefe de operaciones
     spec6 = next(d for d in docs if d.num == 6)
-    assert "BR-03" in spec6.markdown
-    assert "Solo el administrador crea" in spec6.markdown        # §7 alcance
+    assert "BR-03" in spec6.markdown   # jefe de operaciones - SPEC-006 usa BR-03
+    assert "jefe de operaciones" in spec6.markdown.lower()
     spec1 = next(d for d in docs if d.num == 1)
-    assert "Pago de pasajes" in spec1.markdown                     # §6 alcance en §14
-    assert "8 semanas" in spec1.markdown                         # §12 alcance en §13
+    assert "Pago de pasajes" in spec1.markdown          # §14 fuera de alcance
+    assert "etapa de arquitectura" in spec1.markdown   # §13 restricciones
 
 
 def test_seleccionar_por_numero_o_slug():
     docs = construir_specs(None, control=VACIO)
-    assert len(seleccionar(docs, "all")) == 12
+    assert len(seleccionar(docs, "all")) == 13
     assert [d.num for d in seleccionar(docs, "003")] == [3]
     assert [d.num for d in seleccionar(docs, "3")] == [3]
     assert [d.num for d in seleccionar(docs, "rutas")] == [1]
+    assert [d.num for d in seleccionar(docs, "013")] == [13]
     assert seleccionar(docs, "no-existe") == []
 
 
 def test_escribir_specs_en_carpeta(tmp_path):
     docs = construir_specs(None, control=VACIO)
     rutas = escribir_specs(docs, tmp_path)
-    assert len(rutas) == 12
+    assert len(rutas) == 13
     assert (tmp_path / "SPEC-001-consulta-de-rutas.md").exists()
     assert (tmp_path / "SPEC-012-estadisticas-basicas.md").exists()
+    assert (tmp_path / "SPEC-013-modulo-administrador.md").exists()
     contenido = (tmp_path / "SPEC-001-consulta-de-rutas.md").read_text(encoding="utf-8")
     assert "## 17. Historial de cambios" in contenido
 
@@ -109,15 +125,13 @@ def _control_vacio():
 def test_respuestas_se_reflejan_en_seccion_15():
     control = _control_vacio()
     pend = preguntas_pendientes(control)
-    assert len(pend) >= 3                      # OPEN-Q-001..003 del alcance
+    assert len(pend) >= 1                      # OPEN-Q-001 en el nuevo documento
     assert registrar_respuesta(control, "OPEN-Q-001", "Se cargan manualmente", "Profesor")
     assert not registrar_respuesta(control, "OPEN-Q-999", "no existe")
     docs = construir_specs(None, control=control)
     d = docs[0]
     assert "OPEN-Q-001** — **Respondida** (Profesor" in d.markdown
     assert "Se cargan manualmente" in d.markdown
-    assert "OPEN-Q-002** — **Pendiente**" in d.markdown
-    assert len(preguntas_pendientes(control)) >= 2
 
 
 def test_aprobar_bloqueado_por_preguntas_pendientes():
@@ -177,26 +191,75 @@ def test_preguntas_sugeridas_por_el_agente():
     control = _control_vacio()
     pend = preguntas_pendientes(control, spec_num=1)
     ids = {q["id"] for q in pend}
-    assert {"SUG-001-RNF-01", "SUG-001-RNF-02", "SUG-001-RNF-03",
-            "SUG-001-CASOS", "SUG-001-DEP"} <= ids
-    # los RNF son campos numéricos con unidad (la interfaz usa number_input)
-    rnf = [q for q in pend if q["id"].startswith("SUG-001-RNF-")]
-    assert len(rnf) == 3 and all(q.get("campo") == "numero" for q in rnf)
-    assert {q.get("unidad") for q in rnf} == {"s", "%"}
-    # con la §14 del alcance sin filas [por definir], no hay SUG-RNF global
+    # los RNF ya NO son preguntas: los propone el modelo en la corrida de historias
+    assert {"SUG-001-CASOS", "SUG-001-DEP"} <= ids
+    assert not [q for q in pend if q["id"].startswith("SUG-001-RNF-")]
     assert "SUG-RNF" not in ids
+    assert not [q for q in pend if q.get("campo") == "numero"]
 
     docs = construir_specs(None, control=control)
     md = docs[0].markdown
-    assert "Preguntas sugeridas por el agente" in md and "SUG-001-RNF-01" in md
+    assert "Preguntas sugeridas por el agente" in md and "SUG-001-CASOS" in md
     assert "SUG-001-CASOS" not in docs[4].markdown   # las sugerencias son por SPEC
 
     for q in pend:
-        valor = "2" if q.get("campo") == "numero" else f"ok: {q['id']}"
-        assert registrar_respuesta(control, q["id"], valor, "Profe")
+        assert registrar_respuesta(control, q["id"], f"ok: {q['id']}", "Profe")
     assert not [q for q in preguntas_pendientes(control, spec_num=1)
                 if str(q["id"]).startswith("SUG-")]
     assert not registrar_respuesta(control, "SUG-XXX", "id inexistente")
+    # los RNF siguen siendo corregibles por el equipo (id válido aunque no sean pregunta)
+    assert registrar_respuesta(control, "SUG-001-RNF-01", "1.5", "Profe")
+
+
+def test_propuestas_rnf_del_llm_se_guardan_sin_pisar_respuestas(tmp_path):
+    from generador.schemas import RnfEspec
+
+    ruta = tmp_path / "control.json"
+    # el equipo ya definió la disponibilidad a mano antes de la corrida
+    control = cargar_control(ruta)
+    control["respuestas"]["SUG-001-RNF-02"] = {
+        "respuesta": "98", "responsable": "Profe", "fecha": "2026-01-01"}
+    guardar_control(control, ruta)
+
+    rnfs = [RnfEspec(num=1, rendimiento_s=1.5, disponibilidad_pct=99.9,
+                     actualizacion_min=30)]
+    # solo las 2 cifras sin respuesta se guardan como propuesta del modelo
+    assert guardar_propuestas_rnf(rnfs, path=ruta) == 2
+    control = cargar_control(ruta)
+    r = control["respuestas"]["SUG-001-RNF-01"]
+    assert r["respuesta"] == "1.5"
+    assert r["responsable"] == "Modelo LLM (propuesta)"
+    # la respuesta humana previa no se pisa
+    assert control["respuestas"]["SUG-001-RNF-02"]["respuesta"] == "98"
+    # segunda corrida: ya no hay nada que proponer
+    assert guardar_propuestas_rnf(rnfs, path=ruta) == 0
+    # sin propuestas, no escribe nada en disco
+    assert guardar_propuestas_rnf([], path=ruta) == 0
+
+    # §6 muestra las cifras con la etiqueta de quién las definió
+    md = construir_specs(None, control=cargar_control(ruta))[0].markdown
+    sec6 = md.split("## 6.")[1].split("## 7.")[0]
+    assert "**1.5 s** (Modelo LLM (propuesta)" in sec6
+    assert "**98 %** (Profe" in sec6
+    assert "[por definir]" not in sec6
+    assert "sin propuesta aún" not in sec6
+
+
+def test_la_nota_de_s6_cambia_cuando_se_aprueba():
+    control = _control_vacio()
+    sec6 = construir_specs(None, control=control)[0].markdown
+    sec6 = sec6.split("## 6.")[1].split("## 7.")[0]
+    assert "Los propone el modelo LLM" in sec6          # borrador: explica propuestas
+    assert "confirmados por el equipo" not in sec6
+
+    for q in preguntas_pendientes(control, spec_num=1):
+        registrar_respuesta(control, q["id"], "x", "Profe")
+    ok, _ = aprobar(control, 1, "Profe")
+    assert ok
+    sec6 = construir_specs(None, control=control)[0].markdown
+    sec6 = sec6.split("## 6.")[1].split("## 7.")[0]
+    assert "confirmados por el equipo al aprobar" in sec6
+    assert "Los propone el modelo LLM" not in sec6      # ya no cuelga el estado viejo
 
 
 def test_respuestas_de_sugerencias_alimentan_las_secciones():
@@ -211,35 +274,24 @@ def test_respuestas_de_sugerencias_alimentan_las_secciones():
     assert "cada 30 segundos" in sec6
     assert "**2 s** (Profe" in sec6                # crédito de quién definió
     assert "[por definir]" not in sec6             # las 3 respondidas + fijas "Definido"
-    assert "SUG-001-RNF-01** — **Respondida** (Profe" in md
+    # los RNF respondidos ya no se listan en §15 (dejaron de ser preguntas)
+    assert "SUG-001-RNF-01** — **" not in md
 
 
-def test_rnf_por_spec_bloquean_aprobacion_hasta_poner_las_cifras():
+def test_los_rnf_no_son_preguntas_y_no_bloquean_la_aprobacion():
     control = _control_vacio()
-    # respondo todo menos los RNF numéricos: la aprobación sigue bloqueada
-    for q in preguntas_pendientes(control, spec_num=1):
-        if q.get("campo") == "numero":
-            continue
-        registrar_respuesta(control, q["id"], "x", "Profe")
-    pend_rnf = [q for q in preguntas_pendientes(control, spec_num=1)
-                if q.get("campo") == "numero"]
-    assert {q["id"] for q in pend_rnf} == {"SUG-001-RNF-01", "SUG-001-RNF-02", "SUG-001-RNF-03"}
-    ok, _ = aprobar(control, 1, "Profe")
-    assert not ok
-    for suf, val in (("01", "2"), ("02", "99.5"), ("03", "30")):
-        registrar_respuesta(control, f"SUG-001-RNF-{suf}", val, "Profe")
-    assert preguntas_pendientes(control, spec_num=1) == []
+    pend = preguntas_pendientes(control, spec_num=1)
+    # ni ni global ni por SPEC hay campos numéricos ni SUG-RNF (antes: 36 + 1)
+    assert not [q for q in pend if q.get("campo") == "numero"]
+    assert not [q for q in pend if "RNF" in q["id"]]
+    control2 = _control_vacio()
+    assert not [q for q in preguntas_pendientes(control2) if q.get("campo") == "numero"]
+    assert not [q for q in preguntas_pendientes(control2) if q["id"] == "SUG-RNF"]
+    # aprobar solo exige resolver CASOS/DEP/OPEN-Q: las cifras RNF no bloquean
+    for q in pend:
+        assert registrar_respuesta(control, q["id"], "x", "Profe")
     ok, _ = aprobar(control, 1, "Profe")
     assert ok
-
-    # CLI --responder sin SPEC: los 36 RNF (12 SPECs × 3 cifras) + estáticas
-    control2 = _control_vacio()
-    rnf = [q for q in preguntas_pendientes(control2) if q.get("campo") == "numero"]
-    assert len(rnf) == 36
-    assert {q["id"] for q in rnf if q["id"].startswith("SUG-007-")} == {
-        "SUG-007-RNF-01", "SUG-007-RNF-02", "SUG-007-RNF-03"}
-    # la §14 ya no tiene [por definir] → nunca se plantea la SUG-RNF global
-    assert not [q for q in preguntas_pendientes(control2) if q["id"] == "SUG-RNF"]
 
 
 # ── §2.8 gestión de cambios ────────────────────────────────────────────
@@ -282,21 +334,30 @@ def test_contexto_para_el_llm_sale_del_alcance():
     ctx = contexto_proyecto(control=control)
     assert "[PROBLEMA]" in ctx and "[SOLUCIÓN]" in ctx
     assert "[OBJETIVOS]" in ctx and "movilidad de los pasajeros" in ctx
-    assert "[PÚBLICO OBJETIVO]" in ctx and "Estudiantes" in ctx
+    # §4 del nuevo documento = Roles (ya no hay "Público objetivo")
+    assert "[ROLES]" in ctx and "Administrador" in ctx
     assert "[ALCANCES" in ctx and "Consulta de rutas" in ctx
     assert "FUERA DE ALCANCE" in ctx and "Pago de pasajes" in ctx
     assert "REGLAS DE NEGOCIO" in ctx and "BR-01" in ctx
     assert "[PRIORIZACIÓN]" in ctx and "Imprescindible" in ctx
-    assert "[ROLES]" in ctx and "Administrador" in ctx
-    # §14 RNF: solo las filas fijas decididas entran al contexto (§14 sin pendientes)
+    # RNF: solo las filas fijas decididas entran al contexto (las pendientes no)
     assert "REQUISITOS NO FUNCIONALES" in ctx and "| RNF-01 |" in ctx
     assert "[por definir]" not in ctx
-    # las decisiones pendientes (§10) NO se filtran al modelo: no debe inventar
-    assert "OPEN-Q-" not in ctx
+    # la tabla de preguntas abiertas (con Estado/Responsable) NO se incluye en el contexto
+    # (puede haber referencias OPEN-Q en el texto del documento, pero no la tabla de estado)
+    assert "| Pendiente |" not in ctx     # fila de la tabla de preguntas no debe aparecer
     assert "DECISIONES YA TOMADAS" not in ctx
-    assert len(ctx) < 8000                        # cabe holgadamente en num_ctx=8192
 
     registrar_respuesta(control, "OPEN-Q-001", "Sí, también festivos", "Profe")
     ctx2 = contexto_proyecto(control=control)
     assert "DECISIONES YA TOMADAS" in ctx2
     assert "Sí, también festivos" in ctx2
+
+    # una propuesta del modelo va en bloque aparte, no como decisión del equipo
+    registrar_respuesta(control, "SUG-002-RNF-01", "1.5", "Modelo LLM (propuesta)")
+    ctx3 = contexto_proyecto(control=control)
+    i_dec = ctx3.find("DECISIONES")
+    i_prop = ctx3.find("RNF PROPUESTOS POR EL MODELO")
+    i_rnf = ctx3.find("SUG-002-RNF-01")
+    assert 0 <= i_dec < i_prop < i_rnf
+    assert "pendiente de aprobación" in ctx3

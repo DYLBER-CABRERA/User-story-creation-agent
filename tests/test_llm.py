@@ -10,6 +10,7 @@ def mk_settings(**kwargs):
         ollama_num_predict=1800,
         google_api_key="fake-key",
         gemini_model="gemini-2.5-flash",
+        gemini_max_output_tokens=0,
         groq_api_key="",
         groq_model="qwen/qwen3.8-27b",
         provider_order=("ollama", "gemini"),
@@ -58,3 +59,15 @@ def test_groq_sin_api_key_se_omite():
     s = mk_settings(groq_api_key="")
     provs = build_providers(s, order=("groq", "ollama"))
     assert [n for n, _ in provs] == ["ollama"]
+
+
+def test_gemini_max_output_tokens_se_pasa_al_modelo():
+    """~30 historias superan el default ~8192 de Gemini y la respuesta llega
+    truncada: GEMINI_MAX_OUTPUT_TOKENS se pasa como max_output_tokens."""
+    s = mk_settings(gemini_max_output_tokens=32768)
+    provs = dict(build_providers(s, order=("gemini",)))
+    assert provs["gemini"].max_output_tokens == 32768
+    # 0 = no enviar el parámetro: se conserva el default del modelo (None)
+    s0 = mk_settings(gemini_max_output_tokens=0)
+    provs0 = dict(build_providers(s0, order=("gemini",)))
+    assert provs0["gemini"].max_output_tokens is None
