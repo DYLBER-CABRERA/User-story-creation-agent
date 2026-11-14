@@ -1,4 +1,4 @@
-"""Proveedores LLM: Ollama local (todo en GPU, sin tope de salida por defecto) y Gemini."""
+"""Proveedores LLM: Ollama local, Gemini API y Groq API (con respaldo automático)."""
 from __future__ import annotations
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -49,12 +49,33 @@ def build_providers(
                 continue
             from langchain_google_genai import ChatGoogleGenerativeAI
 
+            kwargs: dict = {}
+            if s.gemini_max_output_tokens > 0:
+                # sin esto Gemini corta la respuesta en su default (~8192) y con
+                # muchas historias el JSON llega truncado → error de parseo
+                kwargs["max_output_tokens"] = s.gemini_max_output_tokens
             providers.append(
                 (
                     "gemini",
                     ChatGoogleGenerativeAI(
                         model=modelos.get("gemini", s.gemini_model),
                         google_api_key=s.google_api_key,
+                        temperature=s.temperature,
+                        **kwargs,
+                    ),
+                )
+            )
+        elif name == "groq":
+            if not s.groq_api_key:
+                continue
+            from langchain_groq import ChatGroq
+
+            providers.append(
+                (
+                    "groq",
+                    ChatGroq(
+                        model=modelos.get("groq", s.groq_model),
+                        api_key=s.groq_api_key,
                         temperature=s.temperature,
                     ),
                 )

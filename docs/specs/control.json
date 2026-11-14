@@ -1,0 +1,251 @@
+{
+  "respuestas": {
+    "OPEN-Q-001": {
+      "respuesta": "los subministra la empresa",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    },
+    "OPEN-Q-002": {
+      "respuesta": "avisos dentro de la misma",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    },
+    "OPEN-Q-003": {
+      "respuesta": "le reporta al usuario que perdio la ubicacion y le dice este pendiente de la siguiente buseta con la misma ruta",
+      "responsable": "Web",
+      "fecha": "2026-09-29"
+    },
+    "SUG-001-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Web",
+      "fecha": "2026-09-30"
+    },
+    "SUG-001-RNF-02": {
+      "respuesta": "20",
+      "responsable": "Web",
+      "fecha": "2026-09-30"
+    },
+    "SUG-001-RNF-03": {
+      "respuesta": "10",
+      "responsable": "Web",
+      "fecha": "2026-09-30"
+    },
+    "SUG-001-CASOS": {
+      "respuesta": "datos faltantes",
+      "responsable": "Web",
+      "fecha": "2026-09-30"
+    },
+    "SUG-001-DEP": {
+      "respuesta": "Apis",
+      "responsable": "Web",
+      "fecha": "2026-09-30"
+    },
+    "SUG-002-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-002-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-002-RNF-03": {
+      "respuesta": "5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-003-RNF-01": {
+      "respuesta": "2",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-003-RNF-02": {
+      "respuesta": "99.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-003-RNF-03": {
+      "respuesta": "0.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-004-RNF-01": {
+      "respuesta": "2.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-004-RNF-02": {
+      "respuesta": "99",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-004-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-005-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-005-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-005-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-006-RNF-01": {
+      "respuesta": "2",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-006-RNF-02": {
+      "respuesta": "99.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-006-RNF-03": {
+      "respuesta": "10",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-007-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-007-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-007-RNF-03": {
+      "respuesta": "0.2",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-008-RNF-01": {
+      "respuesta": "0.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-008-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-008-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-009-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-009-RNF-02": {
+      "respuesta": "99.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-009-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-010-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-010-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-010-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-011-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-011-RNF-02": {
+      "respuesta": "99.5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-011-RNF-03": {
+      "respuesta": "5",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-012-RNF-01": {
+      "respuesta": "2",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-012-RNF-02": {
+      "respuesta": "99",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-012-RNF-03": {
+      "respuesta": "60",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-06"
+    },
+    "SUG-002-CASOS": {
+      "respuesta": "concurrencia",
+      "responsable": "Web",
+      "fecha": "2026-10-06"
+    },
+    "SUG-002-DEP": {
+      "respuesta": "Apis",
+      "responsable": "Web",
+      "fecha": "2026-10-06"
+    },
+    "SUG-013-RNF-01": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-12"
+    },
+    "SUG-013-RNF-02": {
+      "respuesta": "99.9",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-12"
+    },
+    "SUG-013-RNF-03": {
+      "respuesta": "1",
+      "responsable": "Modelo LLM (propuesta)",
+      "fecha": "2026-10-12"
+    }
+  },
+  "estados": {
+    "002": {
+      "estado": "aprobada",
+      "version": "1.0",
+      "por": "Equipo",
+      "fecha": "2026-10-06"
+    }
+  },
+  "eventos": [
+    {
+      "spec": "002",
+      "evento": "Aprobada",
+      "por": "Equipo",
+      "fecha": "2026-10-06",
+      "version": "1.0"
+    }
+  ]
+}
